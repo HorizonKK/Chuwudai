@@ -1,0 +1,74 @@
+# 储物袋插件配置文件
+
+# 储物袋类型配置
+bag-types:
+  27:
+    name: "&a小型储物袋"
+    lore:
+      - "&7容量: 27格"
+      - "&8ID: %id%"
+  54:
+    name: "&6中型储物袋"
+    lore:
+      - "&7容量: 54格"
+      - "&8ID: %id%"
+  81:
+    name: "&9大型储物袋"
+    lore:
+      - "&7容量: 81格 (2页)"
+      - "&8ID: %id%"
+  108:
+    name: "&d巨型储物袋"
+    lore:
+      - "&7容量: 108格 (3页)"
+      - "&8ID: %id%"
+
+# 灵石类型配置 (支持自定义)
+spirit-stones:
+  "&f下品灵石":
+    material: DIAMOND
+    custom-model-data: 1001
+    lore:
+      - "&7普通的灵石，蕴含少量灵气"
+  "&a中品灵石":
+    material: EMERALD
+    custom-model-data: 1002
+    lore:
+      - "&7中等品质的灵石"
+  "&e上品灵石":
+    material: GOLD_INGOT
+    custom-model-data: 1003
+    lore:
+      - "&7高品质的灵石"
+  "&c极品灵石":
+    material: NETHERITE_INGOT
+    custom-model-data: 1004
+    lore:
+      - "&7极为罕见的极品灵石"
+
+# 自动拾取设置
+auto-pickup:
+  enabled: true
+  # 需要将储物袋放在背包顶部第一格才生效
+  require-slot-zero: true
+  check-interval: 5 # 检查间隔(ticks)
+
+# 界面设置
+ui:
+  page-next: "&a下一页 →"
+  page-prev: "&c← 上一页"
+  close-button: "&c关闭"
+  current-page: "&7第 %page% 页 / %total% 页"
+
+# 数据库设置 (可选)
+database:
+  enabled: false
+  type: mysql # mysql 或 sqlite
+  mysql:
+    host: localhost
+    port: 3306
+    database: chuwudai
+    username: root
+    password: ""
+  sqlite:
+    file: bags.db

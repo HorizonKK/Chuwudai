@@ -1,0 +1,23 @@
+messages:
+  prefix: "&8[&6储物袋&8] &f"
+  no-permission: "&c你没有权限使用此命令！"
+  bag-received: "&a你获得了一个 %type% &a(ID: %id%)"
+  bag-not-found: "&c找不到ID为 %id% 的储物袋！"
+  bag-opened: "&a已打开储物袋 %id%"
+  bag-saved: "&a储物袋数据已保存"
+  stone-pickup: "&a已自动存入 %amount% 个 %stone%"
+  inventory-full: "&c储物袋已满，无法存入更多物品！"
+  invalid-stone: "&c这不是有效的灵石！"
+  no-bag-in-slot: "&c请在背包第一格放置储物袋以自动吸收灵石！"
+
+commands:
+  give:
+    usage: "&c用法: /chuwudai give <玩家> <类型[27/54/81/108]>"
+    success: "&a已给予 %player% 一个%type%储物袋"
+  open:
+    usage: "&c用法: /chuwudai open <储物袋ID>"
+    success: "&a正在打开储物袋..."
+  list:
+    header: "&6=== 你的储物袋列表 ==="
+    item: "  &7- &f%id% &8(&7%type%格&8)"
+    empty: "&c你还没有储物袋"

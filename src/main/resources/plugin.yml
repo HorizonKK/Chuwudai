@@ -1,0 +1,31 @@
+name: Chuwudai
+version: '1.0-SNAPSHOT'
+main: com.horizonkk.chuwudai.Chuwudai
+api-version: '1.21'
+prefix: 储物
+authors: [ HorizonKK ]
+description: 储物袋功能插件
+
+commands:
+  chuwudai:
+    description: 储物袋主命令
+    aliases: [cd, bag]
+    usage: /<command> <give|open|reload|help>
+
+permissions:
+  chuwudai.give:
+    description: 允许给予储物袋
+    default: op
+  chuwudai.open:
+    description: 允许打开储物袋
+    default: true
+  chuwudai.reload:
+    description: 允许重载插件
+    default: op
+  chuwudai.*:
+    description: 所有储物袋权限
+    default: op
+    children:
+      chuwudai.give: true
+      chuwudai.open: true
+      chuwudai.reload: true
