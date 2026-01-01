@@ -4,6 +4,7 @@ import com.horizonkk.chuwudai.bag.BagManager;
 import com.horizonkk.chuwudai.command.BagCommand;
 import com.horizonkk.chuwudai.data.BagDataManager;
 import com.horizonkk.chuwudai.listener.BagListener;
+import com.horizonkk.chuwudai.listener.BagOperationRestrictionListener;
 import com.horizonkk.chuwudai.listener.StonePickupListener;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -30,6 +31,8 @@ public final class Chuwudai extends JavaPlugin {
         // 注册事件监听器
         getServer().getPluginManager().registerEvents(new BagListener(), this);
         getServer().getPluginManager().registerEvents(new StonePickupListener(), this);
+        // 添加新的监听器
+        getServer().getPluginManager().registerEvents(new BagOperationRestrictionListener(), this);
 
         // 异步加载数据
         getServer().getScheduler().runTaskAsynchronously(this, () -> {

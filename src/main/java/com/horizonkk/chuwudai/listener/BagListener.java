@@ -138,47 +138,6 @@ public class BagListener implements Listener {
         }
     }
 
-    @EventHandler
-    public void onInventoryClickInPlayerInventory(InventoryClickEvent event) {
-        // 检查是否在自己的背包中
-        if (event.getView().getType() != InventoryType.CRAFTING &&
-                event.getView().getType() != InventoryType.PLAYER) {
-            return;
-        }
-
-        // 检查点击的物品是否是储物袋
-        ItemStack clickedItem = event.getCurrentItem();
-        if (clickedItem != null && isBagItem(clickedItem)) {
-            // 检查是否在储物袋界面中
-            if (isInBagInventory(event)) {
-                event.setCancelled(true);
-                // 发送提示消息
-                if (event.getWhoClicked() instanceof Player) {
-                    Player player = (Player) event.getWhoClicked();
-                    player.sendMessage(Chuwudai.getInstance().getConfig().getString("messages.prefix", "&8[&6储物袋&8] &f") +
-                            Chuwudai.getInstance().getConfig().getString("messages.bag-operation-restricted", "&c无法在储物袋界面中操作储物袋物品！"));
-                }
-            }
-        }
-    }
-
-    // 辅助方法：检查是否在储物袋界面中
-    private boolean isInBagInventory(InventoryClickEvent event) {
-        return event.getView().getTopInventory().getHolder() instanceof BagInventory;
-    }
-
-    // 辅助方法：检查是否是储物袋物品
-    private boolean isBagItem(ItemStack item) {
-        if (item == null || !item.hasItemMeta()) return false;
-
-        ItemMeta meta = item.getItemMeta();
-        if (meta.hasDisplayName()) {
-            String displayName = meta.getDisplayName();
-            return displayName.contains("储物袋");
-        }
-
-        return false;
-    }
 
     private ItemStack findBagItem(HumanEntity player, String bagId) {
         for (ItemStack item : player.getInventory().getContents()) {
