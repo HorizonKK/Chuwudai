@@ -94,8 +94,17 @@ public class StonePickupListener implements Listener {
                     BagData bagData = Chuwudai.getInstance().getBagManager().getBagData(bagId);
                     if (bagData != null) {
                         Map<String, Integer> stoneCounts = bagData.getStoneCounts();
-                        BagItem.updateBagLore(bagItem, stoneCounts);
+                        // 重新从玩家背包获取储物袋，确保引用是最新的
+                        ItemStack currentBagItem = requireSlotZero ?
+                                player.getInventory().getItem(9) :
+                                findBagInInventory(player);
+                        if (currentBagItem != null) {
+                            BagItem.updateBagLore(currentBagItem, stoneCounts);
+                        }
                         Chuwudai.getInstance().getBagManager().saveBagData(bagId);
+                        // 强制刷新玩家背包显示
+                        Player player = (Player) event.getEntity();
+                        player.updateInventory();
                     }
                 }
             }.runTaskAsynchronously(Chuwudai.getInstance());
@@ -135,12 +144,13 @@ public class StonePickupListener implements Listener {
         String stoneType = getStoneName(stone);
         int amount = stone.getAmount();
         int maxStackSize = stone.getMaxStackSize();
-
         // 寻找已有的灵石堆叠
         for (int i = 0; i < bagData.getSize(); i++) {
             ItemStack existing = bagData.getItem(i);
             if (existing != null &&
                     existing.getType() == stone.getType() &&
+                    existing.hasItemMeta() && stone.hasItemMeta() && // 添加空值检查
+                    existing.getItemMeta().hasDisplayName() && stone.getItemMeta().hasDisplayName() && // 添加显示名称检查
                     existing.getItemMeta().getDisplayName().equals(stone.getItemMeta().getDisplayName())) {
 
                 int availableSpace = maxStackSize - existing.getAmount();
@@ -155,7 +165,6 @@ public class StonePickupListener implements Listener {
                 }
             }
         }
-
         // 寻找空位
         for (int i = 0; i < bagData.getSize(); i++) {
             if (bagData.getItem(i) == null) {
@@ -175,6 +184,10 @@ public class StonePickupListener implements Listener {
     }
 
     private String getStoneName(ItemStack stone) {
-        return stone.getItemMeta().getDisplayName();
+        if (stone.hasItemMeta() && stone.getItemMeta().hasDisplayName()) {
+            return stone.getItemMeta().getDisplayName();
+        }
+        // 如果没有显示名称，返回类型名称作为备选
+        return stone.getType().name();
     }
 }
