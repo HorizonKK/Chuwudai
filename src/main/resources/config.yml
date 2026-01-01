@@ -4,21 +4,29 @@
 bag-types:
   27:
     name: "&a小型储物袋"
+    material: PAPER
+    custom-model-data: 10021 #储物袋材质
     lore:
       - "&7容量: 27格"
       - "&8ID: %id%"
   54:
     name: "&6中型储物袋"
+    material: PAPER
+    custom-model-data: 10021 #储物袋材质
     lore:
       - "&7容量: 54格"
       - "&8ID: %id%"
   81:
     name: "&9大型储物袋"
+    material: PAPER
+    custom-model-data: 10021 #储物袋材质
     lore:
       - "&7容量: 81格 (2页)"
       - "&8ID: %id%"
   108:
     name: "&d巨型储物袋"
+    material: PAPER
+    custom-model-data: 10021 #储物袋材质
     lore:
       - "&7容量: 108格 (3页)"
       - "&8ID: %id%"

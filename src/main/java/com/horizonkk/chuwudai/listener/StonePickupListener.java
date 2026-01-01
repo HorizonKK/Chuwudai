@@ -68,24 +68,24 @@ public class StonePickupListener implements Listener {
         // 尝试将灵石存入储物袋
         int remaining = tryStoreStoneInBag(pickedItem, bagData);
         Chuwudai.getInstance().getLogger().info("After trying to store, remaining amount: " + remaining);
-
         if (remaining < pickedItem.getAmount()) {
             // 部分或全部存入成功
             int storedAmount = pickedItem.getAmount() - remaining;
-            event.getItem().getItemStack().setAmount(remaining);
 
-            if (remaining <= 0) {
+            if (remaining > 0) {
+                // 如果还有剩余，更新物品数量
+                event.getItem().getItemStack().setAmount(remaining);
+            } else {
+                // 如果全部存入，取消拾取事件
                 event.setCancelled(true);
                 event.getItem().remove();
             }
-
             // 发送消息
             String stoneName = getStoneName(pickedItem);
             player.sendMessage(Chuwudai.getInstance().getConfig().getString("messages.prefix", "") +
                     Chuwudai.getInstance().getConfig().getString("messages.stone-pickup", "&a已自动存入 %amount% 个 %stone%")
                             .replace("%amount%", String.valueOf(storedAmount))
                             .replace("%stone%", stoneName));
-
             // 更新储物袋Lore
             new BukkitRunnable() {
                 @Override
@@ -103,15 +103,13 @@ public class StonePickupListener implements Listener {
                         }
                         Chuwudai.getInstance().getBagManager().saveBagData(bagId);
                         // 强制刷新玩家背包显示
-                        Player player = (Player) event.getEntity();
                         player.updateInventory();
                     }
                 }
             }.runTaskAsynchronously(Chuwudai.getInstance());
-        } else {
-            Chuwudai.getInstance().getLogger().info("No stone stored, maybe bag is full or other reason.");
         }
     }
+
 
     private boolean isSpiritStone(ItemStack item) {
         if (!item.hasItemMeta() || !item.getItemMeta().hasDisplayName()) {
@@ -144,13 +142,14 @@ public class StonePickupListener implements Listener {
         String stoneType = getStoneName(stone);
         int amount = stone.getAmount();
         int maxStackSize = stone.getMaxStackSize();
+
         // 寻找已有的灵石堆叠
         for (int i = 0; i < bagData.getSize(); i++) {
             ItemStack existing = bagData.getItem(i);
             if (existing != null &&
                     existing.getType() == stone.getType() &&
-                    existing.hasItemMeta() && stone.hasItemMeta() && // 添加空值检查
-                    existing.getItemMeta().hasDisplayName() && stone.getItemMeta().hasDisplayName() && // 添加显示名称检查
+                    existing.hasItemMeta() && stone.hasItemMeta() &&
+                    existing.getItemMeta().hasDisplayName() && stone.getItemMeta().hasDisplayName() &&
                     existing.getItemMeta().getDisplayName().equals(stone.getItemMeta().getDisplayName())) {
 
                 int availableSpace = maxStackSize - existing.getAmount();
@@ -158,6 +157,7 @@ public class StonePickupListener implements Listener {
                     int toAdd = Math.min(availableSpace, amount);
                     existing.setAmount(existing.getAmount() + toAdd);
                     amount -= toAdd;
+                    bagData.setItem(i, existing); // 确保更新数据
 
                     if (amount <= 0) {
                         return 0;
@@ -173,13 +173,11 @@ public class StonePickupListener implements Listener {
                 newStack.setAmount(toAdd);
                 bagData.setItem(i, newStack);
                 amount -= toAdd;
-
                 if (amount <= 0) {
                     return 0;
                 }
             }
         }
-
         return amount; // 无法完全存入的剩余数量
     }
 

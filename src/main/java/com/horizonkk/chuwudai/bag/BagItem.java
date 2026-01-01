@@ -21,39 +21,47 @@ public class BagItem {
 
     // 创建储物袋物品
     public static ItemStack createBag(int size, String id) {
-        Material material;
-        switch (size) {
-            case 27: material = Material.LEATHER; break;
-            case 54: material = Material.IRON_INGOT; break;
-            case 81: material = Material.GOLD_INGOT; break;
-            case 108: material = Material.DIAMOND; break;
-            default: material = Material.CHEST;
-        }
+        Material material = Material.CHEST; // 默认材质
+        int customModelData = 10021; // 默认自定义模型数据
+        // 从配置中获取材质信息
+        ConfigurationSection bagTypesSection = Chuwudai.getInstance().getConfig().getConfigurationSection("bag-types");
+        if (bagTypesSection != null) {
+            ConfigurationSection typeInfo = bagTypesSection.getConfigurationSection(String.valueOf(size));
+            if (typeInfo != null) {
+                String materialName = typeInfo.getString("material");
+                if (materialName != null) {
+                    try {
+                        material = Material.valueOf(materialName.toUpperCase());
+                    } catch (IllegalArgumentException e) {
+                        Chuwudai.getInstance().getLogger().warning("无效的材质名称: " + materialName + ", 使用默认材质");
+                    }
+                }
 
+                customModelData = typeInfo.getInt("custom-model-data", customModelData);
+            }
+        }
         ItemStack item = new ItemStack(material, 1);
         ItemMeta meta = item.getItemMeta();
-
         // 设置名称
         String name = "储物袋";
-        ConfigurationSection bagTypesSection = Chuwudai.getInstance().getConfig().getConfigurationSection("bag-types");
         if (bagTypesSection != null) {
             ConfigurationSection typeInfo = bagTypesSection.getConfigurationSection(String.valueOf(size));
             if (typeInfo != null) {
                 name = typeInfo.getString("name", "储物袋");
             }
         }
-
         meta.setDisplayName(name.replace("&", "§"));
-
         // 创建完整的Lore
         List<String> lore = createCompleteLore(id, size, new HashMap<>());
         meta.setLore(lore);
-
+        // 设置自定义模型数据（如果配置了）
+        if (customModelData > 0) {
+            meta.setCustomModelData(customModelData);
+        }
         // 添加NBT数据
         PersistentDataContainer data = meta.getPersistentDataContainer();
         data.set(BAG_ID_KEY, PersistentDataType.STRING, id);
         data.set(BAG_SIZE_KEY, PersistentDataType.INTEGER, size);
-
         item.setItemMeta(meta);
         return item;
     }
