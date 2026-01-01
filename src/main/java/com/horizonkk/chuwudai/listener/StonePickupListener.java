@@ -16,56 +16,80 @@ import org.bukkit.scheduler.BukkitRunnable;
 import java.util.Map;
 
 public class StonePickupListener implements Listener {
-    
+
     @EventHandler(priority = EventPriority.MONITOR)
     public void onStonePickup(EntityPickupItemEvent event) {
-        if (!(event.getEntity() instanceof Player) || !event.isCancelled()) {
+        if (!(event.getEntity() instanceof Player)) {
             return;
         }
+
         Player player = (Player) event.getEntity();
         ItemStack pickedItem = event.getItem().getItemStack();
+
+        // 调试日志
+        Chuwudai.getInstance().getLogger().info("StonePickupListener triggered for player: " + player.getName());
+        Chuwudai.getInstance().getLogger().info("Picked item: " + pickedItem.getType() + " display name: " + (pickedItem.hasItemMeta() && pickedItem.getItemMeta().hasDisplayName() ? pickedItem.getItemMeta().getDisplayName() : "no display name"));
+
         // 检查是否是灵石
-        if (!isSpiritStone(pickedItem)) {
+        boolean isStone = isSpiritStone(pickedItem);
+        Chuwudai.getInstance().getLogger().info("Is spirit stone: " + isStone);
+        if (!isStone) {
             return;
         }
+
         // 检查是否启用自动拾取
-        if (!Chuwudai.getInstance().getConfig().getBoolean("auto-pickup.enabled", true)) {
+        boolean autoPickupEnabled = Chuwudai.getInstance().getConfig().getBoolean("auto-pickup.enabled", true);
+        Chuwudai.getInstance().getLogger().info("Auto pickup enabled: " + autoPickupEnabled);
+        if (!autoPickupEnabled) {
             return;
         }
+
         // 检查是否需要在第一格放置储物袋
         boolean requireSlotZero = Chuwudai.getInstance().getConfig().getBoolean("auto-pickup.require-slot-zero", true);
         ItemStack bagItem = requireSlotZero ? player.getInventory().getItem(0) : findBagInInventory(player);
+        Chuwudai.getInstance().getLogger().info("Require slot zero: " + requireSlotZero);
+        Chuwudai.getInstance().getLogger().info("Bag item in slot 0: " + (bagItem != null ? bagItem.getType() + " with meta: " + bagItem.hasItemMeta() : "null"));
+
         if (bagItem == null || !BagItem.isBagItem(bagItem)) {
             if (requireSlotZero) {
                 player.sendMessage(Chuwudai.getInstance().getConfig().getString("messages.prefix", "") +
                         Chuwudai.getInstance().getConfig().getString("messages.no-bag-in-slot", "&c请在背包第一格放置储物袋以自动吸收灵石！"));
             }
+            Chuwudai.getInstance().getLogger().info("Bag item is null or not a bag item");
             return;
         }
-        
+
         // 获取储物袋ID和数据
         String bagId = BagItem.getBagId(bagItem);
+        Chuwudai.getInstance().getLogger().info("Bag ID: " + bagId);
         BagData bagData = Chuwudai.getInstance().getBagManager().getBagData(bagId);
-        
+        Chuwudai.getInstance().getLogger().info("Bag data loaded: " + (bagData != null));
+
         if (bagData == null) {
             return;
         }
+
         // 尝试将灵石存入储物袋
         int remaining = tryStoreStoneInBag(pickedItem, bagData);
+        Chuwudai.getInstance().getLogger().info("After trying to store, remaining amount: " + remaining);
+
         if (remaining < pickedItem.getAmount()) {
             // 部分或全部存入成功
             int storedAmount = pickedItem.getAmount() - remaining;
             event.getItem().getItemStack().setAmount(remaining);
+
             if (remaining <= 0) {
                 event.setCancelled(true);
                 event.getItem().remove();
             }
+
             // 发送消息
             String stoneName = getStoneName(pickedItem);
             player.sendMessage(Chuwudai.getInstance().getConfig().getString("messages.prefix", "") +
                     Chuwudai.getInstance().getConfig().getString("messages.stone-pickup", "&a已自动存入 %amount% 个 %stone%")
                             .replace("%amount%", String.valueOf(storedAmount))
                             .replace("%stone%", stoneName));
+
             // 更新储物袋Lore
             new BukkitRunnable() {
                 @Override
@@ -74,6 +98,8 @@ public class StonePickupListener implements Listener {
                     Chuwudai.getInstance().getBagManager().saveBagData(bagId);
                 }
             }.runTaskAsynchronously(Chuwudai.getInstance());
+        } else {
+            Chuwudai.getInstance().getLogger().info("No stone stored, maybe bag is full or other reason.");
         }
     }
 
@@ -82,13 +108,19 @@ public class StonePickupListener implements Listener {
             return false;
         }
         String displayName = item.getItemMeta().getDisplayName();
-        // 简化检查逻辑
-        return displayName.contains("下品灵石") ||
-                displayName.contains("中品灵石") ||
-                displayName.contains("上品灵石") ||
-                displayName.contains("极品灵石");
+        ConfigurationSection stones = Chuwudai.getInstance().getConfig().getConfigurationSection("spirit-stones");
+        if (stones != null) {
+            for (String stoneName : stones.getKeys(false)) {
+                // 将配置中的名称中的"&"替换为"§"，然后与物品显示名称比较
+                String coloredStoneName = stoneName.replace("&", "§");
+                if (displayName.equals(coloredStoneName)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
-    
+
     private ItemStack findBagInInventory(Player player) {
         for (ItemStack item : player.getInventory().getContents()) {
             if (item != null && BagItem.isBagItem(item)) {
@@ -97,32 +129,32 @@ public class StonePickupListener implements Listener {
         }
         return null;
     }
-    
+
     private int tryStoreStoneInBag(ItemStack stone, BagData bagData) {
         String stoneType = getStoneName(stone);
         int amount = stone.getAmount();
         int maxStackSize = stone.getMaxStackSize();
-        
+
         // 寻找已有的灵石堆叠
         for (int i = 0; i < bagData.getSize(); i++) {
             ItemStack existing = bagData.getItem(i);
-            if (existing != null && 
-                existing.getType() == stone.getType() &&
-                existing.getItemMeta().getDisplayName().equals(stone.getItemMeta().getDisplayName())) {
-                
+            if (existing != null &&
+                    existing.getType() == stone.getType() &&
+                    existing.getItemMeta().getDisplayName().equals(stone.getItemMeta().getDisplayName())) {
+
                 int availableSpace = maxStackSize - existing.getAmount();
                 if (availableSpace > 0) {
                     int toAdd = Math.min(availableSpace, amount);
                     existing.setAmount(existing.getAmount() + toAdd);
                     amount -= toAdd;
-                    
+
                     if (amount <= 0) {
                         return 0;
                     }
                 }
             }
         }
-        
+
         // 寻找空位
         for (int i = 0; i < bagData.getSize(); i++) {
             if (bagData.getItem(i) == null) {
@@ -131,16 +163,16 @@ public class StonePickupListener implements Listener {
                 newStack.setAmount(toAdd);
                 bagData.setItem(i, newStack);
                 amount -= toAdd;
-                
+
                 if (amount <= 0) {
                     return 0;
                 }
             }
         }
-        
+
         return amount; // 无法完全存入的剩余数量
     }
-    
+
     private String getStoneName(ItemStack stone) {
         return stone.getItemMeta().getDisplayName();
     }
