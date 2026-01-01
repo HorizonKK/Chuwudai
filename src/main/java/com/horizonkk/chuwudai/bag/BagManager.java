@@ -78,12 +78,7 @@ public class BagManager {
             player.sendMessage(Chuwudai.getInstance().getConfig().getString("messages.prefix", "&8[&6储物袋&8] &f") +
                     Chuwudai.getInstance().getConfig().getString("messages.bag-opened", "&a已打开储物袋 %id%")
                             .replace("%id%", bagId));
-            // 更新储物袋Lore
-            ItemStack bagItem = findBagInPlayerInventory(player, bagId);
-            if (bagItem != null) {
-                Map<String, Integer> stoneCounts = bagData.getStoneCounts();
-                BagItem.updateBagLore(bagItem, stoneCounts);
-            }
+            // 注意：打开时不需要更新Lore，因为库存事件会处理
         } catch (Exception e) {
             player.sendMessage(Chuwudai.getInstance().getConfig().getString("messages.prefix", "&8[&6储物袋&8] &f") +
                     "&c打开储物袋时发生错误，请联系管理员");

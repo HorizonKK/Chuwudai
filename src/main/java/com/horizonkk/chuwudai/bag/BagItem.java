@@ -104,51 +104,64 @@ public class BagItem {
     private static List<String> rebuildLoreWithBagInfo(List<String> oldLore,
                                                        Map<String, Integer> stoneCounts, BagData bagData) {
         List<String> lore = new ArrayList<>();
-        // 第一部分：储物袋基本信息和ID
-        boolean foundBaseInfo = false;
+        // 标记是否已经添加了基本信息、操作提示、灵石信息和容量信息
+        boolean addedStorageInfo = false;
+        boolean addedCapacityInfo = false;
+        // 复制旧Lore，跳过需要替换的部分
         for (String line : oldLore) {
-            if (line.contains("ID:") || line.contains("容量:")) {
-                lore.add(line);
-                foundBaseInfo = true;
-            } else if (!line.contains("当前存储:") &&
-                    !line.contains("下品灵石:") &&
-                    !line.contains("中品灵石:") &&
-                    !line.contains("上品灵石:") &&
-                    !line.contains("极品灵石:") &&
-                    !line.contains("可通过置于背包") &&
-                    !line.contains("储物大小:") &&
-                    !line.contains("当前容量:")) {
-                // 保留其他非储物袋信息的行
-                lore.add(line);
+            // 跳过旧的灵石信息行
+            if (line.contains("当前存储:") ||
+                    line.contains("下品灵石:") ||
+                    line.contains("中品灵石:") ||
+                    line.contains("上品灵石:") ||
+                    line.contains("极品灵石:")) {
+                if (!addedStorageInfo) {
+                    // 只保留第一次遇到的"当前存储:"行，后续的灵石行跳过
+                    lore.add("§7当前存储:");
+                    lore.add("  §f下品灵石: §7" + stoneCounts.getOrDefault("&f下品灵石", 0));
+                    lore.add("  §a中品灵石: §7" + stoneCounts.getOrDefault("&a中品灵石", 0));
+                    lore.add("  §e上品灵石: §7" + stoneCounts.getOrDefault("&e上品灵石", 0));
+                    lore.add("  §c极品灵石: §7" + stoneCounts.getOrDefault("&c极品灵石", 0));
+                    addedStorageInfo = true;
+                }
+                continue; // 跳过这些行
+            }
+            // 跳过旧的容量信息行
+            if (line.contains("储物大小:") || line.contains("当前容量:")) {
+                if (!addedCapacityInfo && bagData != null) {
+                    // 添加新的容量信息
+                    lore.add("§f储物大小: §7" + bagData.getUsedSlots() + "/" + bagData.getSize() + " 槽位");
+                    lore.add("§f当前容量: " + formatProgressBar(bagData));
+                    addedCapacityInfo = true;
+                } else if (!addedCapacityInfo) {
+                    // 如果没有BagData，添加默认信息
+                    lore.add("§f储物大小: §70/0 槽位");
+                    lore.add("§f当前容量: §70% §8||||||||||||||||||||");
+                    addedCapacityInfo = true;
+                }
+                continue; // 跳过这些行
+            }
+            // 保留其他行
+            lore.add(line);
+        }
+        // 如果还没有添加灵石信息，添加它
+        if (!addedStorageInfo) {
+            lore.add("§7当前存储:");
+            lore.add("  §f下品灵石: §7" + stoneCounts.getOrDefault("&f下品灵石", 0));
+            lore.add("  §a中品灵石: §7" + stoneCounts.getOrDefault("&a中品灵石", 0));
+            lore.add("  §e上品灵石: §7" + stoneCounts.getOrDefault("&e上品灵石", 0));
+            lore.add("  §c极品灵石: §7" + stoneCounts.getOrDefault("&c极品灵石", 0));
+        }
+        // 如果还没有添加容量信息，添加它
+        if (!addedCapacityInfo) {
+            if (bagData != null) {
+                lore.add("§f储物大小: §7" + bagData.getUsedSlots() + "/" + bagData.getSize() + " 槽位");
+                lore.add("§f当前容量: " + formatProgressBar(bagData));
+            } else {
+                lore.add("§f储物大小: §70/0 槽位");
+                lore.add("§f当前容量: §70% §8||||||||||||||||||||");
             }
         }
-        // 如果没有找到基本信息行，添加一个空行
-        if (!foundBaseInfo) {
-            lore.add("");
-        }
-        // 第二部分：操作提示
-        lore.add("§8可通过置于背包的储物袋槽位中右键点击打开储物袋");
-        lore.add("");
-
-        // 第三部分：灵石存储信息
-        lore.add("§7当前存储:");
-        lore.add("  §f下品灵石: §7" + stoneCounts.getOrDefault("&f下品灵石", 0));
-        lore.add("  §a中品灵石: §7" + stoneCounts.getOrDefault("&a中品灵石", 0));
-        lore.add("  §e上品灵石: §7" + stoneCounts.getOrDefault("&e上品灵石", 0));
-        lore.add("  §c极品灵石: §7" + stoneCounts.getOrDefault("&c极品灵石", 0));
-
-        // 第四部分：容量信息（如果有BagData）
-        if (bagData != null) {
-            lore.add("");
-            lore.add("§f储物大小: §7" + bagData.getUsedSlots() + "/" + bagData.getSize() + " 槽位");
-            lore.add("§f当前容量: " + formatProgressBar(bagData));
-        } else {
-            // 如果没有BagData，显示默认信息
-            lore.add("");
-            lore.add("§f储物大小: §70/0 槽位");
-            lore.add("§f当前容量: §70% §8||||||||||||||||||||");
-        }
-
         return lore;
     }
 
