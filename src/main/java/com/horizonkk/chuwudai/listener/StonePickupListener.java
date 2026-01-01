@@ -90,8 +90,13 @@ public class StonePickupListener implements Listener {
             new BukkitRunnable() {
                 @Override
                 public void run() {
-                    BagItem.updateBagLore(bagItem, bagData.getStoneCounts());
-                    Chuwudai.getInstance().getBagManager().saveBagData(bagId);
+                    // 获取BagData和灵石数量
+                    BagData bagData = Chuwudai.getInstance().getBagManager().getBagData(bagId);
+                    if (bagData != null) {
+                        Map<String, Integer> stoneCounts = bagData.getStoneCounts();
+                        BagItem.updateBagLore(bagItem, stoneCounts);
+                        Chuwudai.getInstance().getBagManager().saveBagData(bagId);
+                    }
                 }
             }.runTaskAsynchronously(Chuwudai.getInstance());
         } else {

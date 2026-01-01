@@ -10,14 +10,15 @@ import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 public class BagItem {
-    
+
     private static final NamespacedKey BAG_ID_KEY = new NamespacedKey(Chuwudai.getInstance(), "bag_id");
     private static final NamespacedKey BAG_SIZE_KEY = new NamespacedKey(Chuwudai.getInstance(), "bag_size");
-    
+
     // 创建储物袋物品
     public static ItemStack createBag(int size, String id) {
         Material material;
@@ -34,38 +35,19 @@ public class BagItem {
 
         // 设置名称
         String name = "储物袋";
-        List<String> lore = new ArrayList<>();
-
-        // 安全地获取配置部分
         ConfigurationSection bagTypesSection = Chuwudai.getInstance().getConfig().getConfigurationSection("bag-types");
         if (bagTypesSection != null) {
             ConfigurationSection typeInfo = bagTypesSection.getConfigurationSection(String.valueOf(size));
             if (typeInfo != null) {
                 name = typeInfo.getString("name", "储物袋");
-
-                // 获取lore列表
-                List<String> loreList = typeInfo.getStringList("lore");
-                lore = new ArrayList<>(loreList);
             }
         }
 
         meta.setDisplayName(name.replace("&", "§"));
 
-        // 设置Lore
-        List<String> finalLore = new ArrayList<>();
-        for (String line : lore) {
-            finalLore.add(line.replace("&", "§").replace("%id%", id));
-        }
-
-        // 添加当前灵石数量（初始为空）
-        finalLore.add("");
-        finalLore.add("§7当前存储:");
-        finalLore.add("  §f下品灵石: §70");
-        finalLore.add("  §a中品灵石: §70");
-        finalLore.add("  §e上品灵石: §70");
-        finalLore.add("  §c极品灵石: §70");
-
-        meta.setLore(finalLore);
+        // 创建完整的Lore
+        List<String> lore = createCompleteLore(id, size, new HashMap<>());
+        meta.setLore(lore);
 
         // 添加NBT数据
         PersistentDataContainer data = meta.getPersistentDataContainer();
@@ -75,67 +57,164 @@ public class BagItem {
         item.setItemMeta(meta);
         return item;
     }
-    
+
     // 从物品获取储物袋ID
     public static String getBagId(ItemStack item) {
         if (item == null || !item.hasItemMeta()) return null;
-        
+
         ItemMeta meta = item.getItemMeta();
         PersistentDataContainer data = meta.getPersistentDataContainer();
-        
+
         if (data.has(BAG_ID_KEY, PersistentDataType.STRING)) {
             return data.get(BAG_ID_KEY, PersistentDataType.STRING);
         }
         return null;
     }
-    
+
     // 检查是否是储物袋
     public static boolean isBagItem(ItemStack item) {
         return getBagId(item) != null;
     }
-    
-    // 更新储物袋Lore显示灵石数量
+
+    // 更新储物袋Lore显示灵石数量和容量信息
     public static void updateBagLore(ItemStack bagItem, Map<String, Integer> stoneCounts) {
         if (!isBagItem(bagItem)) return;
+
         ItemMeta meta = bagItem.getItemMeta();
         List<String> lore = meta.getLore();
+
         if (lore == null) {
             lore = new ArrayList<>();
-            // 添加基础Lore
-            lore.add("§7当前存储:");
         }
-        // 确保Lore有足够的位置
-        while (lore.size() < 5) {
-            lore.add("");
+
+        // 获取储物袋ID以获取BagData
+        String bagId = getBagId(bagItem);
+        BagData bagData = null;
+        if (bagId != null) {
+            bagData = Chuwudai.getInstance().getBagManager().getBagData(bagId);
         }
-        // 更新或添加灵石数量行
-        boolean hasStoneInfo = false;
-        for (int i = 0; i < lore.size(); i++) {
-            String line = lore.get(i);
-            if (line.contains("当前存储")) {
-                hasStoneInfo = true;
-                // 清除旧的灵石信息
-                while (lore.size() > i + 1 && (lore.get(i + 1).contains("灵石"))) {
-                    lore.remove(i + 1);
-                }
-                // 添加新的灵石信息
-                lore.add(i + 1, "  §f下品灵石: §7" + stoneCounts.getOrDefault("&f下品灵石", 0));
-                lore.add(i + 2, "  §a中品灵石: §7" + stoneCounts.getOrDefault("&a中品灵石", 0));
-                lore.add(i + 3, "  §e上品灵石: §7" + stoneCounts.getOrDefault("&e上品灵石", 0));
-                lore.add(i + 4, "  §c极品灵石: §7" + stoneCounts.getOrDefault("&c极品灵石", 0));
-                break;
-            }
-        }
-        // 如果没有找到"当前存储"标签，添加它
-        if (!hasStoneInfo) {
-            lore.add("");
-            lore.add("§7当前存储:");
-            lore.add("  §f下品灵石: §7" + stoneCounts.getOrDefault("&f下品灵石", 0));
-            lore.add("  §a中品灵石: §7" + stoneCounts.getOrDefault("&a中品灵石", 0));
-            lore.add("  §e上品灵石: §7" + stoneCounts.getOrDefault("&e上品灵石", 0));
-            lore.add("  §c极品灵石: §7" + stoneCounts.getOrDefault("&c极品灵石", 0));
-        }
+        // 重建Lore
+        lore = rebuildLoreWithBagInfo(lore, stoneCounts, bagData);
+
         meta.setLore(lore);
         bagItem.setItemMeta(meta);
+    }
+
+    // 重建Lore包含储物袋信息
+    private static List<String> rebuildLoreWithBagInfo(List<String> oldLore,
+                                                       Map<String, Integer> stoneCounts, BagData bagData) {
+        List<String> lore = new ArrayList<>();
+        // 第一部分：储物袋基本信息和ID
+        boolean foundBaseInfo = false;
+        for (String line : oldLore) {
+            if (line.contains("ID:") || line.contains("容量:")) {
+                lore.add(line);
+                foundBaseInfo = true;
+            } else if (!line.contains("当前存储:") &&
+                    !line.contains("下品灵石:") &&
+                    !line.contains("中品灵石:") &&
+                    !line.contains("上品灵石:") &&
+                    !line.contains("极品灵石:") &&
+                    !line.contains("可通过置于背包") &&
+                    !line.contains("储物大小:") &&
+                    !line.contains("当前容量:")) {
+                // 保留其他非储物袋信息的行
+                lore.add(line);
+            }
+        }
+        // 如果没有找到基本信息行，添加一个空行
+        if (!foundBaseInfo) {
+            lore.add("");
+        }
+        // 第二部分：操作提示
+        lore.add("§8可通过置于背包的储物袋槽位中右键点击打开储物袋");
+        lore.add("");
+
+        // 第三部分：灵石存储信息
+        lore.add("§7当前存储:");
+        lore.add("  §f下品灵石: §7" + stoneCounts.getOrDefault("&f下品灵石", 0));
+        lore.add("  §a中品灵石: §7" + stoneCounts.getOrDefault("&a中品灵石", 0));
+        lore.add("  §e上品灵石: §7" + stoneCounts.getOrDefault("&e上品灵石", 0));
+        lore.add("  §c极品灵石: §7" + stoneCounts.getOrDefault("&c极品灵石", 0));
+
+        // 第四部分：容量信息（如果有BagData）
+        if (bagData != null) {
+            lore.add("");
+            lore.add("§f储物大小: §7" + bagData.getUsedSlots() + "/" + bagData.getSize() + " 槽位");
+            lore.add("§f当前容量: " + formatProgressBar(bagData));
+        } else {
+            // 如果没有BagData，显示默认信息
+            lore.add("");
+            lore.add("§f储物大小: §70/0 槽位");
+            lore.add("§f当前容量: §70% §8||||||||||||||||||||");
+        }
+
+        return lore;
+    }
+
+    // 格式化进度条
+    private static String formatProgressBar(BagData bagData) {
+        int used = bagData.getUsedSlots();
+        int total = bagData.getSize();
+        int percentage = bagData.getCapacityPercentage();
+        StringBuilder progressBar = new StringBuilder();
+        // 添加百分比文字
+        progressBar.append("§7").append(percentage).append("% ");
+        // 从配置获取进度条设置
+        int barLength = Chuwudai.getInstance().getConfig().getInt("progress-bar.length", 20);
+        String filledColor = Chuwudai.getInstance().getConfig().getString("progress-bar.filled-color", "&a");
+        String emptyColor = Chuwudai.getInstance().getConfig().getString("progress-bar.empty-color", "&8");
+        boolean showPercentage = Chuwudai.getInstance().getConfig().getBoolean("progress-bar.show-percentage", true);
+        // 生成进度条
+        int filledBars = (percentage * barLength) / 100;
+        int emptyBars = barLength - filledBars;
+        progressBar.append(filledColor.replace("&", "§"));
+        for (int i = 0; i < filledBars; i++) {
+            progressBar.append("|");
+        }
+        progressBar.append(emptyColor.replace("&", "§"));
+        for (int i = 0; i < emptyBars; i++) {
+            progressBar.append("|");
+        }
+
+        return progressBar.toString();
+    }
+
+    // 创建完整的储物袋Lore（用于新创建储物袋）
+    private static List<String> createCompleteLore(String bagId, int size, Map<String, Integer> stoneCounts) {
+        List<String> lore = new ArrayList<>();
+        // 获取配置中的bag-types信息
+        ConfigurationSection bagTypesSection = Chuwudai.getInstance().getConfig().getConfigurationSection("bag-types");
+        if (bagTypesSection != null) {
+            ConfigurationSection typeInfo = bagTypesSection.getConfigurationSection(String.valueOf(size));
+            if (typeInfo != null) {
+                List<String> baseLore = typeInfo.getStringList("lore");
+                for (String line : baseLore) {
+                    lore.add(line.replace("&", "§").replace("%id%", bagId));
+                }
+            } else {
+                // 默认Lore
+                lore.add("§7容量: " + size + "格");
+                lore.add("§8ID: " + bagId);
+            }
+        } else {
+            // 默认Lore
+            lore.add("§7容量: " + size + "格");
+            lore.add("§8ID: " + bagId);
+        }
+        // 添加操作提示
+        lore.add("§8可通过置于背包的储物袋槽位中右键点击打开储物袋");
+        lore.add("");
+        // 添加灵石存储信息
+        lore.add("§7当前存储:");
+        lore.add("  §f下品灵石: §70");
+        lore.add("  §a中品灵石: §70");
+        lore.add("  §e上品灵石: §70");
+        lore.add("  §c极品灵石: §70");
+        // 添加容量信息
+        lore.add("");
+        lore.add("§f储物大小: §70/" + size + " 槽位");
+        lore.add("§f当前容量: §70% §8||||||||||||||||||||");
+        return lore;
     }
 }

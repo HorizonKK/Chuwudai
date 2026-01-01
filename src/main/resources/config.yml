@@ -23,6 +23,12 @@ bag-types:
       - "&7容量: 108格 (3页)"
       - "&8ID: %id%"
 
+progress-bar:
+  length: 20  # 进度条总长度
+  filled-color: "&a"  # 已用部分颜色
+  empty-color: "&8"   # 未用部分颜色
+  show-percentage: true  # 是否显示百分比数字
+
 # 灵石类型配置 (支持自定义)
 spirit-stones:
   "§f下品灵石":

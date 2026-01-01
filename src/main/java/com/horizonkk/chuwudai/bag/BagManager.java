@@ -67,7 +67,6 @@ public class BagManager {
             // 如果是新创建的储物袋，初始化数据
             int defaultSize = 27; // 可以通过其他方式获取实际大小
             bagData = new BagData(bagId, defaultSize);
-
             // 保存新创建的空数据
             Chuwudai.getInstance().getDataManager().saveBag(bagData);
             bagCache.put(bagId, bagData);
@@ -75,17 +74,34 @@ public class BagManager {
         try {
             BagInventory inventory = new BagInventory(bagData);
             inventory.open(player);
-
             // 发送成功消息
             player.sendMessage(Chuwudai.getInstance().getConfig().getString("messages.prefix", "&8[&6储物袋&8] &f") +
                     Chuwudai.getInstance().getConfig().getString("messages.bag-opened", "&a已打开储物袋 %id%")
                             .replace("%id%", bagId));
+            // 更新储物袋Lore
+            ItemStack bagItem = findBagInPlayerInventory(player, bagId);
+            if (bagItem != null) {
+                Map<String, Integer> stoneCounts = bagData.getStoneCounts();
+                BagItem.updateBagLore(bagItem, stoneCounts);
+            }
         } catch (Exception e) {
             player.sendMessage(Chuwudai.getInstance().getConfig().getString("messages.prefix", "&8[&6储物袋&8] &f") +
                     "&c打开储物袋时发生错误，请联系管理员");
             Chuwudai.getInstance().getLogger().severe("打开储物袋时发生错误: " + e.getMessage());
             e.printStackTrace();
         }
+    }
+
+    private ItemStack findBagInPlayerInventory(Player player, String bagId) {
+        for (ItemStack item : player.getInventory().getContents()) {
+            if (item != null && BagItem.isBagItem(item)) {
+                String itemBagId = BagItem.getBagId(item);
+                if (bagId.equals(itemBagId)) {
+                    return item;
+                }
+            }
+        }
+        return null;
     }
 
     // 获取或创建储物袋数据

@@ -118,6 +118,44 @@ public class BagData {
     }
 
 
+    // 获取已使用的槽位数量
+    public int getUsedSlots() {
+        int count = 0;
+        for (int i = 0; i < size; i++) {
+            if (items.get(i) != null) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    // 获取剩余槽位数量
+    public int getFreeSlots() {
+        return size - getUsedSlots();
+    }
+    // 获取容量百分比 (0-100)
+    public int getCapacityPercentage() {
+        if (size == 0) return 0;
+        return (int) ((getUsedSlots() * 100.0) / size);
+    }
+    // 获取进度条字符串
+    public String getProgressBar() {
+        int percentage = getCapacityPercentage();
+        int filledBars = (percentage * 20) / 100; // 总共20个字符长度
+        int emptyBars = 20 - filledBars;
+
+        StringBuilder progressBar = new StringBuilder();
+        progressBar.append("&a");
+        for (int i = 0; i < filledBars; i++) {
+            progressBar.append("|");
+        }
+        progressBar.append("&8");
+        for (int i = 0; i < emptyBars; i++) {
+            progressBar.append("|");
+        }
+
+        return progressBar.toString();
+    }
     // 获取灵石计数
     public Map<String, Integer> getStoneCounts() {
         return new HashMap<>(stoneCounts);

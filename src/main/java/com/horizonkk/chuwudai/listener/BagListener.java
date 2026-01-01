@@ -1,14 +1,19 @@
 package com.horizonkk.chuwudai.listener;
 
 import com.horizonkk.chuwudai.Chuwudai;
+import com.horizonkk.chuwudai.bag.BagData;
+import com.horizonkk.chuwudai.bag.BagInventory;
 import com.horizonkk.chuwudai.bag.BagItem;
 import com.horizonkk.chuwudai.bag.BagManager;
 import org.bukkit.Material;
+import org.bukkit.entity.HumanEntity;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.*;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.ItemStack;
+
+import java.util.Map;
 
 public class BagListener implements Listener {
 
@@ -84,24 +89,25 @@ public class BagListener implements Listener {
     // 原有的事件处理（保持不动）
     @EventHandler
     public void onInventoryClickInBag(InventoryClickEvent event) {
-        if (event.getInventory().getHolder() instanceof com.horizonkk.chuwudai.bag.BagInventory) {
-            com.horizonkk.chuwudai.bag.BagInventory bagInventory =
-                    (com.horizonkk.chuwudai.bag.BagInventory) event.getInventory().getHolder();
+        if (event.getInventory().getHolder() instanceof BagInventory) {
+            BagInventory bagInventory = (BagInventory) event.getInventory().getHolder();
             // 检查是否是控制按钮
             if (bagInventory.isControlSlot(event.getSlot())) {
                 event.setCancelled(true);
                 bagInventory.handleControlClick(event.getSlot());
                 return;
             }
-
             // 异步保存数据
             Chuwudai.getInstance().getServer().getScheduler().runTaskAsynchronously(Chuwudai.getInstance(), () -> {
                 bagInventory.saveItems();
-
                 // 更新储物袋物品的Lore
                 ItemStack bagItem = findBagItem(event.getWhoClicked(), bagInventory.getBagData().getId());
                 if (bagItem != null) {
-                    BagItem.updateBagLore(bagItem, bagInventory.getBagData().getStoneCounts());
+                    // 获取BagData和灵石数量
+                    BagData bagData = bagInventory.getBagData();
+                    Map<String, Integer> stoneCounts = bagData.getStoneCounts();
+                    // 更新Lore
+                    BagItem.updateBagLore(bagItem, stoneCounts);
                 }
             });
         }
@@ -109,22 +115,29 @@ public class BagListener implements Listener {
 
     @EventHandler
     public void onInventoryClose(InventoryCloseEvent event) {
-        if (event.getInventory().getHolder() instanceof com.horizonkk.chuwudai.bag.BagInventory) {
-            com.horizonkk.chuwudai.bag.BagInventory bagInventory =
-                    (com.horizonkk.chuwudai.bag.BagInventory) event.getInventory().getHolder();
-
+        if (event.getInventory().getHolder() instanceof BagInventory) {
+            BagInventory bagInventory =
+                    (BagInventory) event.getInventory().getHolder();
             // 保存数据
             bagInventory.saveItems();
-
             // 更新背包中的储物袋Lore
             ItemStack bagItem = findBagItem(event.getPlayer(), bagInventory.getBagData().getId());
             if (bagItem != null) {
-                BagItem.updateBagLore(bagItem, bagInventory.getBagData().getStoneCounts());
+                // 获取BagData和灵石数量
+                BagData bagData = bagInventory.getBagData();
+                Map<String, Integer> stoneCounts = bagData.getStoneCounts();
+                // 更新Lore
+                BagItem.updateBagLore(bagItem, stoneCounts);
+                // 调试信息
+                Chuwudai.getInstance().getLogger().info("更新储物袋 " + bagData.getId() + " 的Lore");
+                Chuwudai.getInstance().getLogger().info("已用槽位: " + bagData.getUsedSlots() + "/" + bagData.getSize());
+                Chuwudai.getInstance().getLogger().info("容量百分比: " + bagData.getCapacityPercentage() + "%");
             }
         }
     }
 
-    private ItemStack findBagItem(org.bukkit.entity.HumanEntity player, String bagId) {
+
+    private ItemStack findBagItem(HumanEntity player, String bagId) {
         for (ItemStack item : player.getInventory().getContents()) {
             if (item != null && BagItem.isBagItem(item)) {
                 if (bagId.equals(BagItem.getBagId(item))) {
