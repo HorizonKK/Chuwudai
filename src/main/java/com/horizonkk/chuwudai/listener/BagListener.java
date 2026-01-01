@@ -31,35 +31,24 @@ public class BagListener implements Listener {
             }
         }
     }
-    
+
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
         if (event.getInventory().getHolder() instanceof com.horizonkk.chuwudai.bag.BagInventory) {
-            com.horizonkk.chuwudai.bag.BagInventory bagInventory = 
-                (com.horizonkk.chuwudai.bag.BagInventory) event.getInventory().getHolder();
-            
+            com.horizonkk.chuwudai.bag.BagInventory bagInventory =
+                    (com.horizonkk.chuwudai.bag.BagInventory) event.getInventory().getHolder();
             // 检查是否是控制按钮
             if (bagInventory.isControlSlot(event.getSlot())) {
                 event.setCancelled(true);
                 bagInventory.handleControlClick(event.getSlot());
                 return;
             }
-            
-            // 检查放入的物品是否是灵石
-            if (event.getCursor() != null) {
-                ItemStack cursor = event.getCursor();
-                if (!isSpiritStone(cursor)) {
-                    event.setCancelled(true);
-                    event.getWhoClicked().sendMessage(
-                            Chuwudai.getInstance().getConfig().getString("messages.prefix", "") +
-                            Chuwudai.getInstance().getConfig().getString("messages.invalid-stone", "&c这不是有效的灵石！"));
-                }
-            }
-            
+            // 移除对放入物品的限制，允许放入任何物品
+            // 之前的灵石检查逻辑已移除
             // 异步保存数据
             Chuwudai.getInstance().getServer().getScheduler().runTaskAsynchronously(Chuwudai.getInstance(), () -> {
                 bagInventory.saveItems();
-                
+
                 // 更新储物袋物品的Lore
                 ItemStack bagItem = findBagItem(event.getWhoClicked(), bagInventory.getBagData().getId());
                 if (bagItem != null) {

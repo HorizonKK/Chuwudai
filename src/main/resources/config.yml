@@ -25,26 +25,18 @@ bag-types:
 
 # 灵石类型配置 (支持自定义)
 spirit-stones:
-  "&f下品灵石":
-    material: DIAMOND
-    custom-model-data: 1001
-    lore:
-      - "&7普通的灵石，蕴含少量灵气"
-  "&a中品灵石":
-    material: EMERALD
-    custom-model-data: 1002
-    lore:
-      - "&7中等品质的灵石"
-  "&e上品灵石":
-    material: GOLD_INGOT
-    custom-model-data: 1003
-    lore:
-      - "&7高品质的灵石"
-  "&c极品灵石":
-    material: NETHERITE_INGOT
-    custom-model-data: 1004
-    lore:
-      - "&7极为罕见的极品灵石"
+  "下品灵石":
+    material: PAPER
+    custom-model-data: 10016
+  "中品灵石":
+    material: PAPER
+    custom-model-data: 10017
+  "上品灵石":
+    material: PAPER
+    custom-model-data: 10018
+  "极品灵石":
+    material: PAPER
+    custom-model-data: 10019
 
 # 自动拾取设置
 auto-pickup:

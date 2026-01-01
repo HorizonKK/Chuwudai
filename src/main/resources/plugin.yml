@@ -19,6 +19,9 @@ permissions:
   chuwudai.open:
     description: 允许打开储物袋
     default: true
+  chuwudai.test:
+    description: 允许测试物品匹配
+    default: op
   chuwudai.reload:
     description: 允许重载插件
     default: op

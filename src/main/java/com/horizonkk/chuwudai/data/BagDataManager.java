@@ -27,23 +27,23 @@ public class BagDataManager {
         File bagFile = new File(dataFolder, bagId + ".yml");
         return bagFile.exists();
     }
-    
+
     public BagData loadBag(String bagId) {
         // 如果已经在内存中，直接返回
         if (loadedBags.containsKey(bagId)) {
             return loadedBags.get(bagId);
         }
-        
+
         File bagFile = new File(dataFolder, bagId + ".yml");
         if (!bagFile.exists()) {
-            return null;
+            return null; // 文件不存在，返回null
         }
-        
+
         YamlConfiguration yml = YamlConfiguration.loadConfiguration(bagFile);
-        
+
         int size = yml.getInt("size", 27);
         BagData bagData = new BagData(bagId, size);
-        
+
         // 加载物品
         ConfigurationSection itemsSection = yml.getConfigurationSection("items");
         if (itemsSection != null) {
@@ -55,7 +55,7 @@ public class BagDataManager {
                 }
             }
         }
-        
+
         loadedBags.put(bagId, bagData);
         return bagData;
     }

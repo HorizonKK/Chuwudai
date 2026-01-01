@@ -4,6 +4,7 @@ import com.horizonkk.chuwudai.Chuwudai;
 import com.horizonkk.chuwudai.bag.BagData;
 import com.horizonkk.chuwudai.bag.BagItem;
 import com.horizonkk.chuwudai.bag.BagManager;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -85,18 +86,18 @@ public class StonePickupListener implements Listener {
             }.runTaskAsynchronously(Chuwudai.getInstance());
         }
     }
-    
+
     private boolean isSpiritStone(ItemStack item) {
         if (!item.hasItemMeta() || !item.getItemMeta().hasDisplayName()) {
             return false;
         }
-        
         String displayName = item.getItemMeta().getDisplayName();
-        Map<?, ?> stones = Chuwudai.getInstance().getConfig().getConfigurationSection("spirit-stones").getValues(false);
-        
-        for (Object stoneName : stones.keySet()) {
-            if (displayName.equals(stoneName.toString().replace("&", "§"))) {
-                return true;
+        ConfigurationSection stones = Chuwudai.getInstance().getConfig().getConfigurationSection("spirit-stones");
+        if (stones != null) {
+            for (String stoneName : stones.getKeys(false)) {
+                if (displayName.equals(stoneName.replace("&", "§"))) {
+                    return true;
+                }
             }
         }
         return false;

@@ -7,6 +7,7 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 
 import java.util.Arrays;
 import java.util.List;
@@ -98,6 +99,28 @@ public class BagCommand implements CommandExecutor {
             default:
                 sendHelp(sender);
                 break;
+            case "teststone":
+                if (!sender.hasPermission("chuwudai.test")) {
+                    sender.sendMessage(prefix + Chuwudai.getInstance().getConfig().getString("messages.no-permission", "&c你没有权限！"));
+                    return true;
+                }
+
+                if (!(sender instanceof Player)) {
+                    sender.sendMessage(prefix + "&c只有玩家才能使用此命令！");
+                    return true;
+                }
+
+                Player player = (Player) sender;
+                ItemStack item = player.getInventory().getItemInMainHand();
+
+                if (item == null || item.getType() == org.bukkit.Material.AIR) {
+                    player.sendMessage(prefix + "&c你手中没有物品！");
+                    return true;
+                }
+
+                // 测试物品匹配
+                testStoneMatch(player, item);
+                break;
         }
         
         return true;
@@ -116,9 +139,69 @@ public class BagCommand implements CommandExecutor {
         if (sender.hasPermission("chuwudai.reload")) {
             sender.sendMessage("&e/chuwudai reload &7- 重载配置");
         }
+        if (sender.hasPermission("chuwudai.test")) {
+            sender.sendMessage("&e/chuwudai teststone &7- 测试手中物品是否为灵石");
+        }
         sender.sendMessage("&e/chuwudai help &7- 显示帮助");
     }
-    
+
+    private void testStoneMatch(Player player, ItemStack item) {
+        String prefix = Chuwudai.getInstance().getConfig().getString("messages.prefix", "&8[&6储物袋&8] &f");
+
+        // 显示物品基本信息
+        player.sendMessage(prefix + "&6=== 物品匹配测试 ===");
+        player.sendMessage("&7物品类型: &f" + item.getType().name());
+        player.sendMessage("&7物品数量: &f" + item.getAmount());
+
+        if (item.hasItemMeta()) {
+            org.bukkit.inventory.meta.ItemMeta meta = item.getItemMeta();
+            if (meta.hasDisplayName()) {
+                String displayName = meta.getDisplayName();
+                player.sendMessage("&7显示名称: &f'" + displayName + "'");
+            } else {
+                player.sendMessage("&7显示名称: &f无");
+            }
+
+            if (meta.hasLore()) {
+                java.util.List<String> lore = meta.getLore();
+                player.sendMessage("&7Lore行数: &f" + (lore != null ? lore.size() : 0));
+            }
+        } else {
+            player.sendMessage("&7物品Meta: &f无");
+        }
+
+        // 测试配置中的所有灵石类型
+        org.bukkit.configuration.ConfigurationSection stonesSection = Chuwudai.getInstance().getConfig().getConfigurationSection("spirit-stones");
+        if (stonesSection != null) {
+            player.sendMessage("&6--- 配置匹配测试 ---");
+            boolean matched = false;
+
+            for (String key : stonesSection.getKeys(false)) {
+                player.sendMessage("&7尝试匹配 '&e" + key + "&7':");
+
+                if (item.hasItemMeta() && item.getItemMeta().hasDisplayName()) {
+                    String displayName = item.getItemMeta().getDisplayName();
+                    boolean isMatch = displayName.equals(key);
+                    player.sendMessage("  &f" + (isMatch ? "✓" : "✗") + " &7'" + displayName + "' == '" + key + "'");
+
+                    if (isMatch) {
+                        matched = true;
+                        player.sendMessage("&a匹配成功！这是 " + key);
+                    }
+                } else {
+                    player.sendMessage("  &c物品无显示名称，无法匹配");
+                }
+            }
+
+            if (!matched) {
+                player.sendMessage("&c未找到匹配的灵石类型");
+            }
+        } else {
+            player.sendMessage("&c配置文件中未找到 spirit-stones 配置");
+        }
+    }
+
+
     private String getSizeName(int size) {
         switch (size) {
             case 27: return "小型";

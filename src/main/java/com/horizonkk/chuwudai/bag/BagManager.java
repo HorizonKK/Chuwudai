@@ -1,6 +1,7 @@
 package com.horizonkk.chuwudai.bag;
 
 import com.horizonkk.chuwudai.Chuwudai;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
@@ -30,27 +31,30 @@ public class BagManager {
     // 给予玩家储物袋
     public void giveBagToPlayer(Player player, int size) {
         ItemStack bag = createBagItem(size);
+        String bagId = BagItem.getBagId(bag); // 获取新生成的ID
+        // 创建空的储物袋数据并保存
+        BagData emptyBagData = new BagData(bagId, size);
+        Chuwudai.getInstance().getDataManager().saveBag(emptyBagData);
         Map<Integer, ItemStack> leftover = player.getInventory().addItem(bag);
-
         if (!leftover.isEmpty()) {
             // 背包已满，掉落在地上
             player.getWorld().dropItem(player.getLocation(), bag);
         }
 
         String bagType = getBagTypeName(size);
-        String id = BagItem.getBagId(bag);
         player.sendMessage(Chuwudai.getInstance().getConfig().getString("messages.prefix", "&8[&6储物袋&8] &f") +
                 Chuwudai.getInstance().getConfig().getString("messages.bag-received", "&a你获得了一个 %type% &a(ID: %id%)")
                         .replace("%type%", bagType)
-                        .replace("%id%", id));
+                        .replace("%id%", bagId));
     }
-
     // 根据大小获取储物袋类型名称
     private String getBagTypeName(int size) {
-        Map<?, ?> bagTypes = Chuwudai.getInstance().getConfig().getConfigurationSection("bag-types").getValues(false);
-        if (bagTypes.containsKey(String.valueOf(size))) {
-            Map<?, ?> typeInfo = (Map<?, ?>) bagTypes.get(String.valueOf(size));
-            return (String) typeInfo.get("name");
+        ConfigurationSection bagTypes = Chuwudai.getInstance().getConfig().getConfigurationSection("bag-types");
+        if (bagTypes != null) {
+            ConfigurationSection typeInfo = bagTypes.getConfigurationSection(String.valueOf(size));
+            if (typeInfo != null) {
+                return typeInfo.getString("name");
+            }
         }
         return "储物袋";
     }
@@ -59,14 +63,29 @@ public class BagManager {
     public void openBag(Player player, String bagId) {
         BagData bagData = getBagData(bagId);
         if (bagData == null) {
-            player.sendMessage(Chuwudai.getInstance().getConfig().getString("messages.prefix", "") +
-                    Chuwudai.getInstance().getConfig().getString("messages.bag-not-found", "")
-                            .replace("%id%", bagId));
-            return;
-        }
+            // 检查是否是有效的储物袋ID（存在对应的物品）
+            // 如果是新创建的储物袋，初始化数据
+            int defaultSize = 27; // 可以通过其他方式获取实际大小
+            bagData = new BagData(bagId, defaultSize);
 
-        BagInventory inventory = new BagInventory(bagData);
-        inventory.open(player);
+            // 保存新创建的空数据
+            Chuwudai.getInstance().getDataManager().saveBag(bagData);
+            bagCache.put(bagId, bagData);
+        }
+        try {
+            BagInventory inventory = new BagInventory(bagData);
+            inventory.open(player);
+
+            // 发送成功消息
+            player.sendMessage(Chuwudai.getInstance().getConfig().getString("messages.prefix", "&8[&6储物袋&8] &f") +
+                    Chuwudai.getInstance().getConfig().getString("messages.bag-opened", "&a已打开储物袋 %id%")
+                            .replace("%id%", bagId));
+        } catch (Exception e) {
+            player.sendMessage(Chuwudai.getInstance().getConfig().getString("messages.prefix", "&8[&6储物袋&8] &f") +
+                    "&c打开储物袋时发生错误，请联系管理员");
+            Chuwudai.getInstance().getLogger().severe("打开储物袋时发生错误: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 
     // 获取或创建储物袋数据

@@ -1,6 +1,7 @@
 package com.horizonkk.chuwudai.bag;
 
 import com.horizonkk.chuwudai.Chuwudai;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.HashMap;
@@ -69,10 +70,18 @@ public class BagData {
         if (item.hasItemMeta() && item.getItemMeta().hasDisplayName()) {
             String displayName = item.getItemMeta().getDisplayName();
             // 检查是否是配置中的灵石
-            Map<?, ?> stones = Chuwudai.getInstance().getConfig().getConfigurationSection("spirit-stones").getValues(false);
-            for (Object key : stones.keySet()) {
-                if (displayName.equals(key)) {
-                    return (String) key;
+            ConfigurationSection stonesSection = Chuwudai.getInstance().getConfig().getConfigurationSection("spirit-stones");
+            if (stonesSection != null) {
+                for (String key : stonesSection.getKeys(false)) {
+                    // 尝试精确匹配（包含颜色代码）
+                    if (displayName.equals(key)) {
+                        return key;
+                    }
+                    // 尝试去除颜色代码后匹配
+                    String cleanDisplayName = displayName.replace("§", "&");
+                    if (cleanDisplayName.equals(key)) {
+                        return key;
+                    }
                 }
             }
         }
