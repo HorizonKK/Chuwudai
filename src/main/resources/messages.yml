@@ -9,6 +9,7 @@ messages:
   inventory-full: "&c储物袋已满，无法存入更多物品！"
   invalid-stone: "&c这不是有效的灵石！"
   no-bag-in-slot: "&c请在背包第一格放置储物袋以自动吸收灵石！"
+  bag-operation-restricted: "&c无法在储物袋界面中操作储物袋物品！"
 
 commands:
   give:

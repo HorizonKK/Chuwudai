@@ -2,6 +2,7 @@ package com.horizonkk.chuwudai.listener;
 
 import com.horizonkk.chuwudai.Chuwudai;
 import com.horizonkk.chuwudai.bag.BagData;
+import com.horizonkk.chuwudai.bag.BagInventory;
 import com.horizonkk.chuwudai.bag.BagItem;
 import com.horizonkk.chuwudai.bag.BagManager;
 import org.bukkit.configuration.ConfigurationSection;
@@ -24,6 +25,10 @@ public class StonePickupListener implements Listener {
         }
         Player player = (Player) event.getEntity();
         ItemStack pickedItem = event.getItem().getItemStack();
+        // 检查玩家是否在储物袋界面中
+        if (isPlayerInBagInventory(player)) {
+            return; // 在储物袋界面中不处理自动拾取
+        }
         // 调试日志
         Chuwudai.getInstance().getLogger().info("StonePickupListener triggered for player: " + player.getName());
         Chuwudai.getInstance().getLogger().info("Picked item: " + pickedItem.getType() + " display name: " + (pickedItem.hasItemMeta() && pickedItem.getItemMeta().hasDisplayName() ? pickedItem.getItemMeta().getDisplayName() : "no display name"));
@@ -179,6 +184,10 @@ public class StonePickupListener implements Listener {
             }
         }
         return amount; // 无法完全存入的剩余数量
+    }
+
+    private boolean isPlayerInBagInventory(Player player) {
+        return player.getOpenInventory().getTopInventory().getHolder() instanceof BagInventory;
     }
 
     private String getStoneName(ItemStack stone) {
