@@ -67,27 +67,57 @@ public class BagData {
     
     // 识别灵石类型
     private String identifyStone(ItemStack item) {
-        if (item.hasItemMeta() && item.getItemMeta().hasDisplayName()) {
+        if (item != null && item.hasItemMeta() && item.getItemMeta().hasDisplayName()) {
             String displayName = item.getItemMeta().getDisplayName();
-            // 检查是否是配置中的灵石
-            ConfigurationSection stonesSection = Chuwudai.getInstance().getConfig().getConfigurationSection("spirit-stones");
-            if (stonesSection != null) {
-                for (String key : stonesSection.getKeys(false)) {
-                    // 尝试精确匹配（包含颜色代码）
-                    if (displayName.equals(key)) {
-                        return key;
-                    }
-                    // 尝试去除颜色代码后匹配
-                    String cleanDisplayName = displayName.replace("§", "&");
-                    if (cleanDisplayName.equals(key)) {
-                        return key;
-                    }
-                }
+            // 直接检查是否是四种灵石之一（包含颜色代码）
+            if (displayName.contains("下品灵石") ||
+                    displayName.contains("中品灵石") ||
+                    displayName.contains("上品灵石") ||
+                    displayName.contains("极品灵石")) {
+
+                // 标准化名称，去除多余的空格等
+                return standardizeStoneName(displayName);
             }
         }
         return null;
     }
-    
+
+    private String standardizeStoneName(String displayName) {
+        // 将 § 替换为 &
+        String cleanName = displayName.replace("§", "&");
+        // 确保格式正确
+        if (cleanName.contains("下品灵石")) {
+            return "&f下品灵石";
+        } else if (cleanName.contains("中品灵石")) {
+            return "&a中品灵石";
+        } else if (cleanName.contains("上品灵石")) {
+            return "&e上品灵石";
+        } else if (cleanName.contains("极品灵石")) {
+            return "&c极品灵石";
+        }
+        return null;
+    }
+
+    public void debugInfo() {
+        Chuwudai.getInstance().getLogger().info("储物袋 " + id + " 状态:");
+        Chuwudai.getInstance().getLogger().info("容量: " + size + " 格");
+        Chuwudai.getInstance().getLogger().info("物品数量: " + items.size());
+        // 打印灵石统计
+        for (Map.Entry<String, Integer> entry : stoneCounts.entrySet()) {
+            Chuwudai.getInstance().getLogger().info(entry.getKey() + ": " + entry.getValue());
+        }
+        // 打印所有物品
+        for (Map.Entry<Integer, ItemStack> entry : items.entrySet()) {
+            if (entry.getValue() != null) {
+                Chuwudai.getInstance().getLogger().info("槽位 " + entry.getKey() + ": " +
+                        entry.getValue().getType() + " x" + entry.getValue().getAmount() +
+                        " - " + (entry.getValue().hasItemMeta() ?
+                        entry.getValue().getItemMeta().getDisplayName() : "无名称"));
+            }
+        }
+    }
+
+
     // 获取灵石计数
     public Map<String, Integer> getStoneCounts() {
         return new HashMap<>(stoneCounts);

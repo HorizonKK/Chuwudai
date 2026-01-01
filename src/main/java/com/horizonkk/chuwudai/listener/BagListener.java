@@ -1,6 +1,7 @@
 package com.horizonkk.chuwudai.listener;
 
 import com.horizonkk.chuwudai.Chuwudai;
+import com.horizonkk.chuwudai.bag.BagInventory;
 import com.horizonkk.chuwudai.bag.BagItem;
 import com.horizonkk.chuwudai.bag.BagManager;
 import org.bukkit.event.EventHandler;
@@ -9,6 +10,8 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.ItemStack;
+
+import java.util.Map;
 
 public class BagListener implements Listener {
     
@@ -57,20 +60,25 @@ public class BagListener implements Listener {
             });
         }
     }
-    
+
     @EventHandler
     public void onInventoryClose(InventoryCloseEvent event) {
-        if (event.getInventory().getHolder() instanceof com.horizonkk.chuwudai.bag.BagInventory) {
-            com.horizonkk.chuwudai.bag.BagInventory bagInventory = 
-                (com.horizonkk.chuwudai.bag.BagInventory) event.getInventory().getHolder();
-            
+        if (event.getInventory().getHolder() instanceof BagInventory) {
+            BagInventory bagInventory =
+                    (BagInventory) event.getInventory().getHolder();
             // 保存数据
             bagInventory.saveItems();
-            
+            // 调试信息
+            Chuwudai.getInstance().getLogger().info("玩家 " + event.getPlayer().getName() + " 关闭了储物袋 " + bagInventory.getBagData().getId());
+            bagInventory.getBagData().debugInfo();
             // 更新背包中的储物袋Lore
             ItemStack bagItem = findBagItem(event.getPlayer(), bagInventory.getBagData().getId());
             if (bagItem != null) {
-                BagItem.updateBagLore(bagItem, bagInventory.getBagData().getStoneCounts());
+                // 获取灵石数量
+                Map<String, Integer> stoneCounts = bagInventory.getBagData().getStoneCounts();
+                Chuwudai.getInstance().getLogger().info("更新Lore，灵石数量: " + stoneCounts);
+
+                BagItem.updateBagLore(bagItem, stoneCounts);
             }
         }
     }

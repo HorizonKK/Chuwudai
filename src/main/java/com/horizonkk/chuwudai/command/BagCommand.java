@@ -35,18 +35,15 @@ public class BagCommand implements CommandExecutor {
                     sender.sendMessage(prefix + Chuwudai.getInstance().getConfig().getString("messages.no-permission", "&c你没有权限！"));
                     return true;
                 }
-                
                 if (args.length < 3) {
                     sender.sendMessage(prefix + Chuwudai.getInstance().getConfig().getString("commands.give.usage", "&c用法: /chuwudai give <玩家> <类型[27/54/81/108]>"));
                     return true;
                 }
-                
                 Player target = Bukkit.getPlayer(args[1]);
                 if (target == null) {
                     sender.sendMessage(prefix + "&c玩家不在线！");
                     return true;
                 }
-                
                 try {
                     int size = Integer.parseInt(args[2]);
                     List<Integer> validSizes = Arrays.asList(27, 54, 81, 108);
@@ -55,7 +52,6 @@ public class BagCommand implements CommandExecutor {
                         sender.sendMessage(prefix + "&c无效的储物袋大小！可选: 27, 54, 81, 108");
                         return true;
                     }
-                    
                     bagManager.giveBagToPlayer(target, size);
                     sender.sendMessage(prefix + Chuwudai.getInstance().getConfig().getString("commands.give.success", "&a已给予 %player% 一个%type%储物袋")
                             .replace("%player%", target.getName())
@@ -64,7 +60,6 @@ public class BagCommand implements CommandExecutor {
                     sender.sendMessage(prefix + "&c无效的数字！");
                 }
                 break;
-                
             case "open":
                 if (!(sender instanceof Player)) {
                     sender.sendMessage(prefix + "&c只有玩家才能使用此命令！");
@@ -96,12 +91,9 @@ public class BagCommand implements CommandExecutor {
                 break;
                 
             case "help":
-            default:
-                sendHelp(sender);
-                break;
-            case "teststone":
-                if (!sender.hasPermission("chuwudai.test")) {
-                    sender.sendMessage(prefix + Chuwudai.getInstance().getConfig().getString("messages.no-permission", "&c你没有权限！"));
+            case "givestone":
+                if (!sender.hasPermission("chuwudai.give")) {
+                    sender.sendMessage(prefix + "&c你没有权限！");
                     return true;
                 }
 
@@ -110,19 +102,33 @@ public class BagCommand implements CommandExecutor {
                     return true;
                 }
 
-                Player player = (Player) sender;
-                ItemStack item = player.getInventory().getItemInMainHand();
-
-                if (item == null || item.getType() == org.bukkit.Material.AIR) {
-                    player.sendMessage(prefix + "&c你手中没有物品！");
+                Player player1 = (Player) sender;
+                ItemStack stone = createTestStone();
+                player1.getInventory().addItem(stone);
+                player1.sendMessage(prefix + "&a已获得测试灵石");
+                break;
+            case "teststone":
+                if (!sender.hasPermission("chuwudai.test")) {
+                    sender.sendMessage(prefix + Chuwudai.getInstance().getConfig().getString("messages.no-permission", "&c你没有权限！"));
                     return true;
                 }
-
+                if (!(sender instanceof Player)) {
+                    sender.sendMessage(prefix + "&c只有玩家才能使用此命令！");
+                    return true;
+                }
+                Player player2 = (Player) sender;
+                ItemStack item = player2.getInventory().getItemInMainHand();
+                if (item == null || item.getType() == org.bukkit.Material.AIR) {
+                    player2.sendMessage(prefix + "&c你手中没有物品！");
+                    return true;
+                }
                 // 测试物品匹配
-                testStoneMatch(player, item);
+                testStoneMatch(player2, item);
+                break;
+            default:
+                sendHelp(sender);
                 break;
         }
-        
         return true;
     }
     
@@ -143,6 +149,15 @@ public class BagCommand implements CommandExecutor {
             sender.sendMessage("&e/chuwudai teststone &7- 测试手中物品是否为灵石");
         }
         sender.sendMessage("&e/chuwudai help &7- 显示帮助");
+    }
+
+    private ItemStack createTestStone() {
+        ItemStack stone = new ItemStack(org.bukkit.Material.PAPER, 1);
+        org.bukkit.inventory.meta.ItemMeta meta = stone.getItemMeta();
+        meta.setDisplayName("§f下品灵石");
+        meta.setCustomModelData(10016);
+        stone.setItemMeta(meta);
+        return stone;
     }
 
     private void testStoneMatch(Player player, ItemStack item) {

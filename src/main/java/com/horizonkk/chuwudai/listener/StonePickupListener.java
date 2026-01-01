@@ -22,24 +22,19 @@ public class StonePickupListener implements Listener {
         if (!(event.getEntity() instanceof Player) || !event.isCancelled()) {
             return;
         }
-        
         Player player = (Player) event.getEntity();
         ItemStack pickedItem = event.getItem().getItemStack();
-        
         // 检查是否是灵石
         if (!isSpiritStone(pickedItem)) {
             return;
         }
-        
         // 检查是否启用自动拾取
         if (!Chuwudai.getInstance().getConfig().getBoolean("auto-pickup.enabled", true)) {
             return;
         }
-        
         // 检查是否需要在第一格放置储物袋
         boolean requireSlotZero = Chuwudai.getInstance().getConfig().getBoolean("auto-pickup.require-slot-zero", true);
         ItemStack bagItem = requireSlotZero ? player.getInventory().getItem(0) : findBagInInventory(player);
-        
         if (bagItem == null || !BagItem.isBagItem(bagItem)) {
             if (requireSlotZero) {
                 player.sendMessage(Chuwudai.getInstance().getConfig().getString("messages.prefix", "") +
@@ -55,27 +50,22 @@ public class StonePickupListener implements Listener {
         if (bagData == null) {
             return;
         }
-        
         // 尝试将灵石存入储物袋
         int remaining = tryStoreStoneInBag(pickedItem, bagData);
-        
         if (remaining < pickedItem.getAmount()) {
             // 部分或全部存入成功
             int storedAmount = pickedItem.getAmount() - remaining;
             event.getItem().getItemStack().setAmount(remaining);
-            
             if (remaining <= 0) {
                 event.setCancelled(true);
                 event.getItem().remove();
             }
-            
             // 发送消息
             String stoneName = getStoneName(pickedItem);
             player.sendMessage(Chuwudai.getInstance().getConfig().getString("messages.prefix", "") +
                     Chuwudai.getInstance().getConfig().getString("messages.stone-pickup", "&a已自动存入 %amount% 个 %stone%")
                             .replace("%amount%", String.valueOf(storedAmount))
                             .replace("%stone%", stoneName));
-            
             // 更新储物袋Lore
             new BukkitRunnable() {
                 @Override
@@ -92,15 +82,11 @@ public class StonePickupListener implements Listener {
             return false;
         }
         String displayName = item.getItemMeta().getDisplayName();
-        ConfigurationSection stones = Chuwudai.getInstance().getConfig().getConfigurationSection("spirit-stones");
-        if (stones != null) {
-            for (String stoneName : stones.getKeys(false)) {
-                if (displayName.equals(stoneName.replace("&", "§"))) {
-                    return true;
-                }
-            }
-        }
-        return false;
+        // 简化检查逻辑
+        return displayName.contains("下品灵石") ||
+                displayName.contains("中品灵石") ||
+                displayName.contains("上品灵石") ||
+                displayName.contains("极品灵石");
     }
     
     private ItemStack findBagInInventory(Player player) {

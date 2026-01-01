@@ -25,16 +25,16 @@ bag-types:
 
 # 灵石类型配置 (支持自定义)
 spirit-stones:
-  "下品灵石":
+  "§f下品灵石":
     material: PAPER
     custom-model-data: 10016
-  "中品灵石":
+  "§a中品灵石":
     material: PAPER
     custom-model-data: 10017
-  "上品灵石":
+  "§e上品灵石":
     material: PAPER
     custom-model-data: 10018
-  "极品灵石":
+  "§c极品灵石":
     material: PAPER
     custom-model-data: 10019
 

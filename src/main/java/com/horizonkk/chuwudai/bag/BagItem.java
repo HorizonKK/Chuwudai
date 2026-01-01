@@ -97,18 +97,44 @@ public class BagItem {
     // 更新储物袋Lore显示灵石数量
     public static void updateBagLore(ItemStack bagItem, Map<String, Integer> stoneCounts) {
         if (!isBagItem(bagItem)) return;
-        
         ItemMeta meta = bagItem.getItemMeta();
         List<String> lore = meta.getLore();
-        
-        if (lore == null || lore.size() < 8) return;
-        
-        // 更新灵石数量行
-        lore.set(lore.size() - 4, "  §f下品灵石: §7" + stoneCounts.getOrDefault("&f下品灵石", 0));
-        lore.set(lore.size() - 3, "  §a中品灵石: §7" + stoneCounts.getOrDefault("&a中品灵石", 0));
-        lore.set(lore.size() - 2, "  §e上品灵石: §7" + stoneCounts.getOrDefault("&e上品灵石", 0));
-        lore.set(lore.size() - 1, "  §c极品灵石: §7" + stoneCounts.getOrDefault("&c极品灵石", 0));
-        
+        if (lore == null) {
+            lore = new ArrayList<>();
+            // 添加基础Lore
+            lore.add("§7当前存储:");
+        }
+        // 确保Lore有足够的位置
+        while (lore.size() < 5) {
+            lore.add("");
+        }
+        // 更新或添加灵石数量行
+        boolean hasStoneInfo = false;
+        for (int i = 0; i < lore.size(); i++) {
+            String line = lore.get(i);
+            if (line.contains("当前存储")) {
+                hasStoneInfo = true;
+                // 清除旧的灵石信息
+                while (lore.size() > i + 1 && (lore.get(i + 1).contains("灵石"))) {
+                    lore.remove(i + 1);
+                }
+                // 添加新的灵石信息
+                lore.add(i + 1, "  §f下品灵石: §7" + stoneCounts.getOrDefault("&f下品灵石", 0));
+                lore.add(i + 2, "  §a中品灵石: §7" + stoneCounts.getOrDefault("&a中品灵石", 0));
+                lore.add(i + 3, "  §e上品灵石: §7" + stoneCounts.getOrDefault("&e上品灵石", 0));
+                lore.add(i + 4, "  §c极品灵石: §7" + stoneCounts.getOrDefault("&c极品灵石", 0));
+                break;
+            }
+        }
+        // 如果没有找到"当前存储"标签，添加它
+        if (!hasStoneInfo) {
+            lore.add("");
+            lore.add("§7当前存储:");
+            lore.add("  §f下品灵石: §7" + stoneCounts.getOrDefault("&f下品灵石", 0));
+            lore.add("  §a中品灵石: §7" + stoneCounts.getOrDefault("&a中品灵石", 0));
+            lore.add("  §e上品灵石: §7" + stoneCounts.getOrDefault("&e上品灵石", 0));
+            lore.add("  §c极品灵石: §7" + stoneCounts.getOrDefault("&c极品灵石", 0));
+        }
         meta.setLore(lore);
         bagItem.setItemMeta(meta);
     }
