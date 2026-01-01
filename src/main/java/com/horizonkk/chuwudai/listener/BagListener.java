@@ -1,42 +1,89 @@
 package com.horizonkk.chuwudai.listener;
 
 import com.horizonkk.chuwudai.Chuwudai;
-import com.horizonkk.chuwudai.bag.BagInventory;
 import com.horizonkk.chuwudai.bag.BagItem;
 import com.horizonkk.chuwudai.bag.BagManager;
+import org.bukkit.Material;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import org.bukkit.event.inventory.InventoryClickEvent;
-import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.inventory.*;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.ItemStack;
 
-import java.util.Map;
-
 public class BagListener implements Listener {
-    
+
     private final BagManager bagManager;
-    
+
     public BagListener() {
         this.bagManager = Chuwudai.getInstance().getBagManager();
     }
-    
+
+    // 保持原来的手持物品右键打开功能（可选）
     @EventHandler
     public void onPlayerInteract(PlayerInteractEvent event) {
-        ItemStack item = event.getItem();
-        
-        if (item != null && BagItem.isBagItem(item)) {
-            event.setCancelled(true);
-            
-            String bagId = BagItem.getBagId(item);
-            if (bagId != null) {
-                bagManager.openBag(event.getPlayer(), bagId);
+        // 检查是否是右键空气、方块或者物品
+        if (event.getAction() == org.bukkit.event.block.Action.RIGHT_CLICK_AIR ||
+                event.getAction() == org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK) {
+            ItemStack item = event.getItem();
+
+            if (item != null && BagItem.isBagItem(item)) {
+                event.setCancelled(true);
+
+                String bagId = BagItem.getBagId(item);
+                if (bagId != null) {
+                    bagManager.openBag(event.getPlayer(), bagId);
+                }
             }
         }
     }
 
+    // 新添加：检测在背包中右键储物袋
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
+        // 检查点击类型是否是右键
+        if (event.getClick() != ClickType.RIGHT) {
+            return;
+        }
+        // 检查当前打开的库存是否是玩家自己的背包
+        if (event.getView().getType() != InventoryType.CRAFTING &&
+                event.getView().getType() != InventoryType.PLAYER) {
+            return;
+        }
+        // 检查点击的槽位是否是索引9（背包第一行第一格）
+        int slot = event.getSlot();
+        if (slot != 9) {  // 只允许在索引9位置右键打开
+            return;
+        }
+        // 获取被点击的物品
+        ItemStack clickedItem = event.getCurrentItem();
+        if (clickedItem == null || clickedItem.getType() == Material.AIR) {
+            return;
+        }
+        // 检查是否储物袋
+        if (!BagItem.isBagItem(clickedItem)) {
+            return;
+        }
+        // 取消事件，防止物品被移动
+        event.setCancelled(true);
+        // 获取储物袋ID并打开
+        String bagId = BagItem.getBagId(clickedItem);
+        if (bagId != null) {
+            // 关闭背包界面
+            event.getWhoClicked().closeInventory();
+            // 延迟1 tick后打开储物袋，避免冲突
+            Chuwudai.getInstance().getServer().getScheduler().runTaskLater(Chuwudai.getInstance(), () -> {
+                bagManager.openBag((org.bukkit.entity.Player) event.getWhoClicked(), bagId);
+            }, 1L);
+            // 发送消息
+            event.getWhoClicked().sendMessage(Chuwudai.getInstance().getConfig().getString("messages.prefix", "") +
+                    Chuwudai.getInstance().getConfig().getString("messages.bag-opened", "&a已打开储物袋 %id%")
+                            .replace("%id%", bagId));
+        }
+    }
+
+    // 原有的事件处理（保持不动）
+    @EventHandler
+    public void onInventoryClickInBag(InventoryClickEvent event) {
         if (event.getInventory().getHolder() instanceof com.horizonkk.chuwudai.bag.BagInventory) {
             com.horizonkk.chuwudai.bag.BagInventory bagInventory =
                     (com.horizonkk.chuwudai.bag.BagInventory) event.getInventory().getHolder();
@@ -46,8 +93,7 @@ public class BagListener implements Listener {
                 bagInventory.handleControlClick(event.getSlot());
                 return;
             }
-            // 移除对放入物品的限制，允许放入任何物品
-            // 之前的灵石检查逻辑已移除
+
             // 异步保存数据
             Chuwudai.getInstance().getServer().getScheduler().runTaskAsynchronously(Chuwudai.getInstance(), () -> {
                 bagInventory.saveItems();
@@ -63,39 +109,21 @@ public class BagListener implements Listener {
 
     @EventHandler
     public void onInventoryClose(InventoryCloseEvent event) {
-        if (event.getInventory().getHolder() instanceof BagInventory) {
-            BagInventory bagInventory =
-                    (BagInventory) event.getInventory().getHolder();
+        if (event.getInventory().getHolder() instanceof com.horizonkk.chuwudai.bag.BagInventory) {
+            com.horizonkk.chuwudai.bag.BagInventory bagInventory =
+                    (com.horizonkk.chuwudai.bag.BagInventory) event.getInventory().getHolder();
+
             // 保存数据
             bagInventory.saveItems();
-            // 调试信息
-            Chuwudai.getInstance().getLogger().info("玩家 " + event.getPlayer().getName() + " 关闭了储物袋 " + bagInventory.getBagData().getId());
-            bagInventory.getBagData().debugInfo();
+
             // 更新背包中的储物袋Lore
             ItemStack bagItem = findBagItem(event.getPlayer(), bagInventory.getBagData().getId());
             if (bagItem != null) {
-                // 获取灵石数量
-                Map<String, Integer> stoneCounts = bagInventory.getBagData().getStoneCounts();
-                Chuwudai.getInstance().getLogger().info("更新Lore，灵石数量: " + stoneCounts);
-
-                BagItem.updateBagLore(bagItem, stoneCounts);
+                BagItem.updateBagLore(bagItem, bagInventory.getBagData().getStoneCounts());
             }
         }
     }
-    
-    private boolean isSpiritStone(ItemStack item) {
-        if (!item.hasItemMeta() || !item.getItemMeta().hasDisplayName()) {
-            return false;
-        }
-        
-        String displayName = item.getItemMeta().getDisplayName();
-        // 检查是否是四种灵石之一
-        return displayName.contains("下品灵石") || 
-               displayName.contains("中品灵石") || 
-               displayName.contains("上品灵石") || 
-               displayName.contains("极品灵石");
-    }
-    
+
     private ItemStack findBagItem(org.bukkit.entity.HumanEntity player, String bagId) {
         for (ItemStack item : player.getInventory().getContents()) {
             if (item != null && BagItem.isBagItem(item)) {

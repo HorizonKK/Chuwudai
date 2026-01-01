@@ -22,10 +22,8 @@ public class StonePickupListener implements Listener {
         if (!(event.getEntity() instanceof Player)) {
             return;
         }
-
         Player player = (Player) event.getEntity();
         ItemStack pickedItem = event.getItem().getItemStack();
-
         // 调试日志
         Chuwudai.getInstance().getLogger().info("StonePickupListener triggered for player: " + player.getName());
         Chuwudai.getInstance().getLogger().info("Picked item: " + pickedItem.getType() + " display name: " + (pickedItem.hasItemMeta() && pickedItem.getItemMeta().hasDisplayName() ? pickedItem.getItemMeta().getDisplayName() : "no display name"));
@@ -36,19 +34,17 @@ public class StonePickupListener implements Listener {
         if (!isStone) {
             return;
         }
-
         // 检查是否启用自动拾取
         boolean autoPickupEnabled = Chuwudai.getInstance().getConfig().getBoolean("auto-pickup.enabled", true);
         Chuwudai.getInstance().getLogger().info("Auto pickup enabled: " + autoPickupEnabled);
         if (!autoPickupEnabled) {
             return;
         }
-
         // 检查是否需要在第一格放置储物袋
         boolean requireSlotZero = Chuwudai.getInstance().getConfig().getBoolean("auto-pickup.require-slot-zero", true);
-        ItemStack bagItem = requireSlotZero ? player.getInventory().getItem(0) : findBagInInventory(player);
+        ItemStack bagItem = requireSlotZero ? player.getInventory().getItem(9) : findBagInInventory(player);
         Chuwudai.getInstance().getLogger().info("Require slot zero: " + requireSlotZero);
-        Chuwudai.getInstance().getLogger().info("Bag item in slot 0: " + (bagItem != null ? bagItem.getType() + " with meta: " + bagItem.hasItemMeta() : "null"));
+        Chuwudai.getInstance().getLogger().info("Bag item in slot 9: " + (bagItem != null ? bagItem.getType() + " with meta: " + bagItem.hasItemMeta() : "null"));
 
         if (bagItem == null || !BagItem.isBagItem(bagItem)) {
             if (requireSlotZero) {
