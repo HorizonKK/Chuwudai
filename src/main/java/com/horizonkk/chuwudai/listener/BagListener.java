@@ -81,10 +81,6 @@ public class BagListener implements Listener {
             Chuwudai.getInstance().getServer().getScheduler().runTaskLater(Chuwudai.getInstance(), () -> {
                 bagManager.openBag((org.bukkit.entity.Player) event.getWhoClicked(), bagId);
             }, 1L);
-            // 发送消息
-            event.getWhoClicked().sendMessage(Chuwudai.getInstance().getConfig().getString("messages.prefix", "") +
-                    Chuwudai.getInstance().getConfig().getString("messages.bag-opened", "&a已打开储物袋 %id%")
-                            .replace("%id%", bagId));
         }
     }
 

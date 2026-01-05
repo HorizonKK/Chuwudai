@@ -1,6 +1,7 @@
 package com.horizonkk.chuwudai.bag;
 
 import com.horizonkk.chuwudai.Chuwudai;
+import com.horizonkk.chuwudai.utlis.ColorUtils;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -42,10 +43,10 @@ public class BagManager {
         }
 
         String bagType = getBagTypeName(size);
-        player.sendMessage(Chuwudai.getInstance().getConfig().getString("messages.prefix", "&8[&6储物袋&8] &f") +
+        player.sendMessage(ColorUtils.translateColorCodes(Chuwudai.getInstance().getConfig().getString("messages.prefix", "&8[&6储物袋&8] &f") +
                 Chuwudai.getInstance().getConfig().getString("messages.bag-received", "&a你获得了一个 %type% &a(ID: %id%)")
                         .replace("%type%", bagType)
-                        .replace("%id%", bagId));
+                        .replace("%id%", bagId)));
     }
     // 根据大小获取储物袋类型名称
     private String getBagTypeName(int size) {
@@ -75,13 +76,13 @@ public class BagManager {
             BagInventory inventory = new BagInventory(bagData);
             inventory.open(player);
             // 发送成功消息
-            player.sendMessage(Chuwudai.getInstance().getConfig().getString("messages.prefix", "&8[&6储物袋&8] &f") +
+            player.sendMessage(ColorUtils.translateColorCodes(Chuwudai.getInstance().getConfig().getString("messages.prefix", "&8[&6储物袋&8] &f") +
                     Chuwudai.getInstance().getConfig().getString("messages.bag-opened", "&a已打开储物袋 %id%")
-                            .replace("%id%", bagId));
+                            .replace("%id%", bagId)));
             // 注意：打开时不需要更新Lore，因为库存事件会处理
         } catch (Exception e) {
-            player.sendMessage(Chuwudai.getInstance().getConfig().getString("messages.prefix", "&8[&6储物袋&8] &f") +
-                    "&c打开储物袋时发生错误，请联系管理员");
+            player.sendMessage(ColorUtils.translateColorCodes(Chuwudai.getInstance().getConfig().getString("messages.prefix", "&8[&6储物袋&8] &f") +
+                    "&c打开储物袋时发生错误，请联系管理员"));
             Chuwudai.getInstance().getLogger().severe("打开储物袋时发生错误: " + e.getMessage());
             e.printStackTrace();
         }

@@ -3,6 +3,7 @@ package com.horizonkk.chuwudai.listener;
 import com.horizonkk.chuwudai.Chuwudai;
 import com.horizonkk.chuwudai.bag.BagInventory;
 import com.horizonkk.chuwudai.bag.BagItem;
+import com.horizonkk.chuwudai.utlis.ColorUtils;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -30,8 +31,8 @@ public class BagOperationRestrictionListener implements Listener {
             // 发送提示消息
             if (event.getWhoClicked() instanceof Player) {
                 Player player = (Player) event.getWhoClicked();
-                player.sendMessage(Chuwudai.getInstance().getConfig().getString("messages.prefix", "&8[&6储物袋&8] &f") +
-                        Chuwudai.getInstance().getConfig().getString("messages.bag-operation-restricted", "&c无法在储物袋界面中操作储物袋物品！"));
+                player.sendMessage(ColorUtils.translateColorCodes(Chuwudai.getInstance().getConfig().getString("messages.prefix", "&8[&6储物袋&8] &f") +
+                        Chuwudai.getInstance().getConfig().getString("messages.bag-operation-restricted", "&c无法在储物袋界面中操作储物袋物品！")));
             }
         }
 
@@ -43,8 +44,8 @@ public class BagOperationRestrictionListener implements Listener {
                 
                 if (event.getWhoClicked() instanceof Player) {
                     Player player = (Player) event.getWhoClicked();
-                    player.sendMessage(Chuwudai.getInstance().getConfig().getString("messages.prefix", "&8[&6储物袋&8] &f") +
-                            Chuwudai.getInstance().getConfig().getString("messages.bag-operation-restricted", "&c无法在储物袋界面中操作储物袋物品！"));
+                    player.sendMessage(ColorUtils.translateColorCodes(Chuwudai.getInstance().getConfig().getString("messages.prefix", "&8[&6储物袋&8] &f") +
+                            Chuwudai.getInstance().getConfig().getString("messages.bag-operation-restricted", "&c无法在储物袋界面中操作储物袋物品！")));
                 }
             }
         }

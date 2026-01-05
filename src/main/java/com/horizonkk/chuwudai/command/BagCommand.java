@@ -2,6 +2,7 @@ package com.horizonkk.chuwudai.command;
 
 import com.horizonkk.chuwudai.Chuwudai;
 import com.horizonkk.chuwudai.bag.BagManager;
+import com.horizonkk.chuwudai.utlis.ColorUtils;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -133,22 +134,21 @@ public class BagCommand implements CommandExecutor {
     }
     
     private void sendHelp(CommandSender sender) {
-        String prefix = Chuwudai.getInstance().getConfig().getString("messages.prefix", "&8[&6储物袋&8] &f");
-        
-        sender.sendMessage(prefix + "&6=== 储物袋插件帮助 ===");
+        String prefix = ColorUtils.translateColorCodes(Chuwudai.getInstance().getConfig().getString("messages.prefix", "&8[&6储物袋&8] &f"));
+        sender.sendMessage(prefix + ColorUtils.translateColorCodes("&6=== 储物袋插件帮助 ==="));
         if (sender.hasPermission("chuwudai.give")) {
-            sender.sendMessage("&e/chuwudai give <玩家> <大小> &7- 给予储物袋");
+            sender.sendMessage(ColorUtils.translateColorCodes("&e/chuwudai give <玩家> <大小> &7- 给予储物袋"));
         }
         if (sender.hasPermission("chuwudai.open")) {
-            sender.sendMessage("&e/chuwudai open <ID> &7- 打开储物袋");
+            sender.sendMessage(ColorUtils.translateColorCodes("&e/chuwudai open <ID> &7- 打开储物袋"));
         }
         if (sender.hasPermission("chuwudai.reload")) {
-            sender.sendMessage("&e/chuwudai reload &7- 重载配置");
+            sender.sendMessage(ColorUtils.translateColorCodes("&e/chuwudai reload &7- 重载配置"));
         }
         if (sender.hasPermission("chuwudai.test")) {
-            sender.sendMessage("&e/chuwudai teststone &7- 测试手中物品是否为灵石");
+            sender.sendMessage(ColorUtils.translateColorCodes("&e/chuwudai teststone &7- 测试手中物品是否为灵石"));
         }
-        sender.sendMessage("&e/chuwudai help &7- 显示帮助");
+        sender.sendMessage(ColorUtils.translateColorCodes("&e/chuwudai help &7- 显示帮助"));
     }
 
     private ItemStack createTestStone() {

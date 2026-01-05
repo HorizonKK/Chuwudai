@@ -5,6 +5,7 @@ import com.horizonkk.chuwudai.bag.BagData;
 import com.horizonkk.chuwudai.bag.BagInventory;
 import com.horizonkk.chuwudai.bag.BagItem;
 import com.horizonkk.chuwudai.bag.BagManager;
+import com.horizonkk.chuwudai.utlis.ColorUtils;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -53,8 +54,8 @@ public class StonePickupListener implements Listener {
 
         if (bagItem == null || !BagItem.isBagItem(bagItem)) {
             if (requireSlotZero) {
-                player.sendMessage(Chuwudai.getInstance().getConfig().getString("messages.prefix", "") +
-                        Chuwudai.getInstance().getConfig().getString("messages.no-bag-in-slot", "&c请在背包第一格放置储物袋以自动吸收灵石！"));
+                player.sendMessage(ColorUtils.translateColorCodes(Chuwudai.getInstance().getConfig().getString("messages.prefix", "") +
+                        Chuwudai.getInstance().getConfig().getString("messages.no-bag-in-slot", "&c请在背包第一格放置储物袋以自动吸收灵石！")));
             }
             Chuwudai.getInstance().getLogger().info("Bag item is null or not a bag item");
             return;
@@ -87,10 +88,10 @@ public class StonePickupListener implements Listener {
             }
             // 发送消息
             String stoneName = getStoneName(pickedItem);
-            player.sendMessage(Chuwudai.getInstance().getConfig().getString("messages.prefix", "") +
+            player.sendMessage(ColorUtils.translateColorCodes(Chuwudai.getInstance().getConfig().getString("messages.prefix", "") +
                     Chuwudai.getInstance().getConfig().getString("messages.stone-pickup", "&a已自动存入 %amount% 个 %stone%")
                             .replace("%amount%", String.valueOf(storedAmount))
-                            .replace("%stone%", stoneName));
+                            .replace("%stone%", stoneName)));
             // 更新储物袋Lore
             new BukkitRunnable() {
                 @Override
