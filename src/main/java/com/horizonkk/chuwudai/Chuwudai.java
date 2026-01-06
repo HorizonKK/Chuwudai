@@ -6,6 +6,7 @@ import com.horizonkk.chuwudai.data.BagDataManager;
 import com.horizonkk.chuwudai.listener.BagListener;
 import com.horizonkk.chuwudai.listener.BagOperationRestrictionListener;
 import com.horizonkk.chuwudai.listener.StonePickupListener;
+import com.horizonkk.chuwudai.utlis.DatabaseManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class Chuwudai extends JavaPlugin {
@@ -45,6 +46,8 @@ public final class Chuwudai extends JavaPlugin {
     public void onDisable() {
         // 保存所有数据
         dataManager.saveAllBags();
+        // 执行数据库优化 清理过期的数据
+        DatabaseManager.vacuum();
         // 关闭数据库连接池
         dataManager.close();
         getLogger().info("储物袋插件已安全关闭！");

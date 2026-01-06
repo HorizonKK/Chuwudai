@@ -1,5 +1,6 @@
 package com.horizonkk.chuwudai.utlis;
 
+import com.horizonkk.chuwudai.Chuwudai;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 
@@ -56,7 +57,18 @@ public class DatabaseManager {
     public static Connection getConnection() throws SQLException {
         return dataSource.getConnection();
     }
-    
+
+    public static void vacuum() {
+        String sql = "VACUUM";
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.execute();
+            Chuwudai.getInstance().getLogger().info("数据库已优化，空间已回收");
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
     public static void close() {
         if (dataSource != null) {
             dataSource.close();
