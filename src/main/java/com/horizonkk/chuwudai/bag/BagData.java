@@ -164,4 +164,14 @@ public class BagData {
     public String getId() { return id; }
     public int getSize() { return size; }
     public int getTotalPages() { return (int) Math.ceil(size / 54.0); }
+
+    public Map<Integer, ItemStack> getAllItems() {
+        return new HashMap<>(items);
+    }
+
+    public void setAllItems(Map<Integer, ItemStack> newItems) {
+        this.items.clear();
+        this.items.putAll(newItems);
+        updateStoneCounts();
+    }
 }

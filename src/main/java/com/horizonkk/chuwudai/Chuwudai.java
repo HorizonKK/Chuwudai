@@ -45,6 +45,8 @@ public final class Chuwudai extends JavaPlugin {
     public void onDisable() {
         // 保存所有数据
         dataManager.saveAllBags();
+        // 关闭数据库连接池
+        dataManager.close();
         getLogger().info("储物袋插件已安全关闭！");
     }
 

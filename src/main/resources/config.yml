@@ -1,4 +1,11 @@
 # 储物袋插件配置文件
+# 存储方式配置
+storage:
+  type: "sqlite"  # 可选: yaml, sqlite
+  sqlite:
+    file: "bags.db"  # SQLite数据库文件路径
+  yaml:
+    folder: "bags"   # YAML文件存储文件夹
 
 # 储物袋类型配置
 bag-types:
@@ -45,7 +52,7 @@ spirit-stones:
   "§a中品灵石":
     material: PAPER
     custom-model-data: 10017
-  "§e上品灵石":
+  "§6上品灵石":
     material: PAPER
     custom-model-data: 10018
   "§c极品灵石":
@@ -65,16 +72,3 @@ ui:
   page-prev: "&c← 上一页"
   close-button: "&c关闭"
   current-page: "&7第 %page% 页 / %total% 页"
-
-# 数据库设置 (可选)
-database:
-  enabled: false
-  type: mysql # mysql 或 sqlite
-  mysql:
-    host: localhost
-    port: 3306
-    database: chuwudai
-    username: root
-    password: ""
-  sqlite:
-    file: bags.db
