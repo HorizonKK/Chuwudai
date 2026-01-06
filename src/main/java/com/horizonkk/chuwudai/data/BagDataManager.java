@@ -3,16 +3,17 @@ package com.horizonkk.chuwudai.data;
 import com.horizonkk.chuwudai.Chuwudai;
 import com.horizonkk.chuwudai.bag.BagData;
 import com.horizonkk.chuwudai.utlis.DatabaseManager;
-import com.horizonkk.chuwudai.utlis.ItemSerializationUtil;
-import org.bukkit.configuration.ConfigurationSection;
+import com.horizonkk.chuwudai.utlis.EfficientItemSerializationUtil;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.inventory.ItemStack;
 
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
 import java.sql.*;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.zip.Deflater;
+import java.util.zip.Inflater;
 
 public class BagDataManager {
 
@@ -108,8 +109,8 @@ public class BagDataManager {
 
                 BagData bagData = new BagData(bagId, size);
 
-                // 从序列化数据反序列化物品
-                Map<Integer, ItemStack> items = ItemSerializationUtil.deserializeItems(data);
+                // 解压缩数据后反序列化物品
+                Map<Integer, ItemStack> items = deserializeCompressedItems(data);
                 bagData.setAllItems(items);
 
                 return bagData;
@@ -166,7 +167,8 @@ public class BagDataManager {
 
             stmt.setString(1, bagData.getId());
             stmt.setInt(2, bagData.getSize());
-            stmt.setString(3, ItemSerializationUtil.serializeItems(bagData.getAllItems()));
+            // 压缩数据后存储
+            stmt.setString(3, serializeCompressedItems(bagData.getAllItems()));
 
             stmt.executeUpdate();
 
@@ -221,7 +223,7 @@ public class BagDataManager {
                 String data = rs.getString("data");
 
                 BagData bagData = new BagData(bagId, size);
-                Map<Integer, ItemStack> items = ItemSerializationUtil.deserializeItems(data);
+                Map<Integer, ItemStack> items = deserializeCompressedItems(data);
                 bagData.setAllItems(items);
 
                 loadedBags.put(bagId, bagData);
@@ -263,6 +265,67 @@ public class BagDataManager {
     public void close() {
         if ("sqlite".equalsIgnoreCase(storageType)) {
             DatabaseManager.close();
+        }
+    }
+
+    // 压缩序列化方法
+    private String serializeCompressedItems(Map<Integer, ItemStack> items) {
+        String serialized = EfficientItemSerializationUtil.serializeItems(items);
+
+        // 使用Deflater压缩数据
+        try {
+            byte[] input = serialized.getBytes("UTF-8");
+            Deflater deflater = new Deflater();
+            deflater.setInput(input);
+            deflater.finish();
+
+            byte[] buffer = new byte[1024];
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+            while (!deflater.finished()) {
+                int count = deflater.deflate(buffer);
+                outputStream.write(buffer, 0, count);
+            }
+
+            deflater.end();
+            byte[] output = outputStream.toByteArray();
+
+            // Base64编码压缩后的数据
+            return Base64.getEncoder().encodeToString(output);
+        } catch (Exception e) {
+            e.printStackTrace();
+            // 如果压缩失败，返回原始数据
+            return serialized;
+        }
+    }
+
+    // 解压缩反序列化方法
+    private Map<Integer, ItemStack> deserializeCompressedItems(String compressedData) {
+        try {
+            // Base64解码
+            byte[] compressedBytes = Base64.getDecoder().decode(compressedData);
+
+            // 解压缩
+            Inflater inflater = new Inflater();
+            inflater.setInput(compressedBytes);
+
+            byte[] buffer = new byte[1024];
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+            while (!inflater.finished()) {
+                int count = inflater.inflate(buffer);
+                outputStream.write(buffer, 0, count);
+            }
+
+            inflater.end();
+            String decompressed = outputStream.toString("UTF-8");
+
+            // 反序列化
+            return EfficientItemSerializationUtil.deserializeItems(decompressed);
+        } catch (Exception e) {
+            e.printStackTrace();
+            // 如果解压缩失败，尝试直接反序列化原始数据
+            return EfficientItemSerializationUtil.deserializeItems(compressedData);
         }
     }
 }
