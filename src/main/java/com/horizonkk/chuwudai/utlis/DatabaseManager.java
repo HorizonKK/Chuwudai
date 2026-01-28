@@ -37,18 +37,28 @@ public class DatabaseManager {
     }
     
     private static void initializeDatabase() {
-        String createTableSQL = """
-            CREATE TABLE IF NOT EXISTS bags (
+        String createBagsTableSQL = """
+        CREATE TABLE IF NOT EXISTS bags (
+            id TEXT PRIMARY KEY,
+            size INTEGER NOT NULL,
+            data TEXT NOT NULL,
+            last_modified TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """;
+        String createPillsTableSQL = """
+            CREATE TABLE IF NOT EXISTS pills (
                 id TEXT PRIMARY KEY,
                 size INTEGER NOT NULL,
                 data TEXT NOT NULL,
                 last_modified TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
             """;
-        
+
         try (Connection conn = getConnection();
-             PreparedStatement stmt = conn.prepareStatement(createTableSQL)) {
-            stmt.execute();
+             PreparedStatement stmtBags = conn.prepareStatement(createBagsTableSQL);
+             PreparedStatement stmtPills = conn.prepareStatement(createPillsTableSQL)) {
+            stmtBags.execute();
+            stmtPills.execute();
         } catch (SQLException e) {
             e.printStackTrace();
         }

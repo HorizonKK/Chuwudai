@@ -3,6 +3,7 @@ package com.horizonkk.chuwudai.command;
 import com.horizonkk.chuwudai.Chuwudai;
 import com.horizonkk.chuwudai.bag.BagManager;
 import com.horizonkk.chuwudai.utlis.ColorUtils;
+import com.horizonkk.chuwudai.utlis.getSize;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -16,9 +17,11 @@ import java.util.List;
 public class BagCommand implements CommandExecutor {
     
     private final BagManager bagManager;
+    private final getSize getSize;
     
     public BagCommand() {
         this.bagManager = Chuwudai.getInstance().getBagManager();
+        this.getSize = new getSize();
     }
     
     @Override
@@ -36,8 +39,8 @@ public class BagCommand implements CommandExecutor {
                     sender.sendMessage(prefix + Chuwudai.getInstance().getConfig().getString("messages.no-permission", "&c你没有权限！"));
                     return true;
                 }
-                if (args.length < 3) {
-                    sender.sendMessage(prefix + Chuwudai.getInstance().getConfig().getString("commands.give.usage", "&c用法: /chuwudai give <玩家> <类型[27/54/81/108]>"));
+                if (args.length < 4) {
+                    sender.sendMessage(prefix + Chuwudai.getInstance().getConfig().getString("commands.give.usage", "&c用法: /chuwudai give <玩家> <类型[bag/pill]> <大小>"));
                     return true;
                 }
                 Player target = Bukkit.getPlayer(args[1]);
@@ -45,18 +48,36 @@ public class BagCommand implements CommandExecutor {
                     sender.sendMessage(prefix + "&c玩家不在线！");
                     return true;
                 }
+
+                String type = args[2].toLowerCase();
                 try {
-                    int size = Integer.parseInt(args[2]);
-                    List<Integer> validSizes = Arrays.asList(27, 54, 81, 108);
-                    
-                    if (!validSizes.contains(size)) {
-                        sender.sendMessage(prefix + "&c无效的储物袋大小！可选: 27, 54, 81, 108");
-                        return true;
+                    int size = Integer.parseInt(args[3]);
+
+                    if (type.equals("bag") || type.equals("储物袋")) {
+                        // 验证储物袋大小
+                        List<Integer> validBagSizes = Arrays.asList(27, 54, 81, 108);
+                        if (!validBagSizes.contains(size)) {
+                            sender.sendMessage(prefix + "&c无效的储物袋大小！可选: 27, 54, 81, 108");
+                            return true;
+                        }
+                        bagManager.giveBagToPlayer(target, size);
+                        sender.sendMessage(prefix + Chuwudai.getInstance().getConfig().getString("commands.give.success", "&a已给予 %player% 一个%type%储物袋")
+                                .replace("%player%", target.getName())
+                                .replace("%type%", getSize.getBagSizeName(size)));
+                    } else if (type.equals("pill") || type.equals("丹瓶")) {
+                        // 验证丹瓶大小
+                        List<Integer> validPillSizes = Arrays.asList(9, 18, 27);
+                        if (!validPillSizes.contains(size)) {
+                            sender.sendMessage(prefix + "&c无效的丹瓶大小！可选: 9, 18, 27");
+                            return true;
+                        }
+                        Chuwudai.getInstance().getPillManager().givePillToPlayer(target, size);
+                        sender.sendMessage(prefix + Chuwudai.getInstance().getConfig().getString("commands.give.success", "&a已给予 %player% 一个%type%丹瓶")
+                                .replace("%player%", target.getName())
+                                .replace("%type%", getSize.getPillSizeName(size)));
+                    } else {
+                        sender.sendMessage(prefix + "&c无效的类型！请输入 'bag'(储物袋) 或 'pill'(丹瓶)");
                     }
-                    bagManager.giveBagToPlayer(target, size);
-                    sender.sendMessage(prefix + Chuwudai.getInstance().getConfig().getString("commands.give.success", "&a已给予 %player% 一个%type%储物袋")
-                            .replace("%player%", target.getName())
-                            .replace("%type%", getSizeName(size)));
                 } catch (NumberFormatException e) {
                     sender.sendMessage(prefix + "&c无效的数字！");
                 }
@@ -137,7 +158,7 @@ public class BagCommand implements CommandExecutor {
         String prefix = ColorUtils.translateColorCodes(Chuwudai.getInstance().getConfig().getString("messages.prefix", "&8[&6储物袋&8] &f"));
         sender.sendMessage(prefix + ColorUtils.translateColorCodes("&6=== 储物袋插件帮助 ==="));
         if (sender.hasPermission("chuwudai.give")) {
-            sender.sendMessage(ColorUtils.translateColorCodes("&e/chuwudai give <玩家> <大小> &7- 给予储物袋"));
+            sender.sendMessage(ColorUtils.translateColorCodes("&e/chuwudai give <玩家> <类型> <大小> &7- 给予储物袋或丹瓶 (type: bag/pill)"));
         }
         if (sender.hasPermission("chuwudai.open")) {
             sender.sendMessage(ColorUtils.translateColorCodes("&e/chuwudai open <ID> &7- 打开储物袋"));
