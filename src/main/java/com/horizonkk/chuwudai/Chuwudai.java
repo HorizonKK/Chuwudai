@@ -9,6 +9,7 @@ import com.horizonkk.chuwudai.listener.PillListener;
 import com.horizonkk.chuwudai.listener.StonePickupListener;
 import com.horizonkk.chuwudai.pill.PillDataManager;
 import com.horizonkk.chuwudai.pill.PillManager;
+import com.horizonkk.chuwudai.pill.PillUseEvent;
 import com.horizonkk.chuwudai.utlis.DatabaseManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -42,6 +43,7 @@ public final class Chuwudai extends JavaPlugin {
         // 添加新的监听器
         getServer().getPluginManager().registerEvents(new BagOperationRestrictionListener(), this);
         getServer().getPluginManager().registerEvents(new PillListener(), this);
+        getServer().getPluginManager().registerEvents(new PillUseEvent(), this);
 
         // 异步加载数据
         getServer().getScheduler().runTaskAsynchronously(this, () -> {

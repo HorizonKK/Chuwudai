@@ -136,7 +136,7 @@ public class PillListener implements Listener {
                 }
             }
 
-            // 异步保存数据
+            // 异步保存数据，避免频繁更新Lore
             Chuwudai.getInstance().getServer().getScheduler().runTaskAsynchronously(Chuwudai.getInstance(), () -> {
                 pillInventory.saveItems();
                 // 更新丹瓶物品的Lore

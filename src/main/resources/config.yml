@@ -41,22 +41,22 @@ bag-types:
 pill-types:
   9:
     name: "&a小型丹瓶"
-    material: GLASS_BOTTLE
-    custom-model-data: 10031
+    material: GOLDEN_APPLE
+    custom-model-data: 10291
     lore:
       - "&7容量: 9格"
       - "&8ID: %id%"
   18:
     name: "&6中型丹瓶"
-    material: GLASS_BOTTLE
-    custom-model-data: 10032
+    material: GOLDEN_APPLE
+    custom-model-data: 10291
     lore:
       - "&7容量: 18格"
       - "&8ID: %id%"
   27:
     name: "&9大型丹瓶"
-    material: GLASS_BOTTLE
-    custom-model-data: 10033
+    material: GOLDEN_APPLE
+    custom-model-data: 10291
     lore:
       - "&7容量: 27格"
       - "&8ID: %id%"

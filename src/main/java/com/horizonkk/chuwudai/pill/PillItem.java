@@ -118,75 +118,65 @@ public class PillItem {
     // 重建Lore包含丹瓶信息
     private static List<String> rebuildLoreWithPillInfo(List<String> oldLore, List<String> pillNames, PillData pillData) {
         List<String> lore = new ArrayList<>();
-        
-        // 标记是否已经添加了基本信息、丹药信息和容量信息
-        boolean addedPillInfo = false;
-        boolean addedCapacityInfo = false;
-        
-        // 复制旧Lore，跳过需要替换的部分
+
+        // 识别并提取基础信息（非重复部分）
+        List<String> baseInfo = new ArrayList<>();
+        boolean inPillSection = false;
+        boolean inCapacitySection = false;
+
         for (String line : oldLore) {
-            // 跳过旧的丹药信息行
-            if (line.contains("当前丹药:")) {
-                if (!addedPillInfo) {
-                    // 添加新的丹药信息
-                    lore.add("§7当前丹药:");
-                    for (int i = 0; i < Math.min(9, pillNames.size()); i++) {
-                        String pillName = pillNames.get(i);
-                        if (pillName != null) {
-                            lore.add("  §7[" + (i+1) + "] §f" + pillName);
-                        } else {
-                            lore.add("  §7[" + (i+1) + "] §7空");
-                        }
-                    }
-                    addedPillInfo = true;
-                }
-                continue; // 跳过这些行
-            }
-            
-            // 跳过旧的容量信息行
-            if (line.contains("丹瓶大小:") || line.contains("当前容量:")) {
-                if (!addedCapacityInfo && pillData != null) {
-                    // 添加新的容量信息
-                    lore.add("§f丹瓶大小: §7" + pillData.getUsedSlots() + "/" + pillData.getSize() + " 槽位");
-                    lore.add("§f当前容量: " + formatProgressBar(pillData));
-                    addedCapacityInfo = true;
-                } else if (!addedCapacityInfo) {
-                    // 如果没有PillData，添加默认信息
-                    lore.add("§f丹瓶大小: §70/0 槽位");
-                    lore.add("§f当前容量: §70% §8||||||||||||||||||||");
-                    addedCapacityInfo = true;
-                }
-                continue; // 跳过这些行
-            }
-            
-            // 保留其他行
-            lore.add(line);
-        }
-        
-        // 如果还没有添加丹药信息，添加它
-        if (!addedPillInfo) {
-            lore.add("§7当前丹药:");
-            for (int i = 0; i < Math.min(9, pillNames.size()); i++) {
-                String pillName = pillNames.get(i);
-                if (pillName != null) {
-                    lore.add("  §7[" + (i+1) + "] §f" + pillName);
-                } else {
-                    lore.add("  §7[" + (i+1) + "] §7空");
-                }
-            }
-        }
-        
-        // 如果还没有添加容量信息，添加它
-        if (!addedCapacityInfo) {
-            if (pillData != null) {
-                lore.add("§f丹瓶大小: §7" + pillData.getUsedSlots() + "/" + pillData.getSize() + " 槽位");
-                lore.add("§f当前容量: " + formatProgressBar(pillData));
+            if (line.contains("容量: ") && line.contains("格") && line.contains("ID: ")) {
+                // 基础信息行，保留
+                baseInfo.add(line);
+            } else if (line.contains("可通过置于背包")) {
+                // 操作提示行，保留
+                baseInfo.add(line);
+            } else if (line.contains("当前丹药:")) {
+                // 开始丹药信息段
+                inPillSection = true;
+                continue; // 不保留旧的丹药标题行
+            } else if (line.matches("\\s*§7\\[\\d+\\]\\s.*")) {
+                // 丹药名称行，跳过
+                continue;
+            } else if (line.contains("丹瓶大小:") || line.contains("当前容量:")) {
+                // 容量信息段
+                inCapacitySection = true;
+                continue; // 不保留旧的容量信息行
+            } else if (line.trim().isEmpty() && !baseInfo.isEmpty() &&
+                    (baseInfo.get(baseInfo.size()-1).contains("丹瓶") ||
+                            baseInfo.get(baseInfo.size()-1).contains("容量"))) {
+                // 保留分割空行
+                continue; // 跳过空行以避免重复
             } else {
-                lore.add("§f丹瓶大小: §70/0 槽位");
-                lore.add("§f当前容量: §70% §8||||||||||||||||||||");
+                // 其他行保留
+                baseInfo.add(line);
             }
         }
-        
+
+        // 添加基础信息
+        lore.addAll(baseInfo);
+
+        // 添加丹药信息
+        lore.add("§7当前丹药:");
+        for (int i = 0; i < Math.min(9, pillNames.size()); i++) {
+            String pillName = pillNames.get(i);
+            if (pillName != null) {
+                lore.add("  §7[" + (i+1) + "] §f" + pillName);
+            } else {
+                lore.add("  §7[" + (i+1) + "] §7空");
+            }
+        }
+
+        // 找到容量信息应该插入的位置（通常在丹药信息之后）
+        lore.add("");
+        if (pillData != null) {
+            lore.add("§f丹瓶大小: §7" + pillData.getUsedSlots() + "/" + pillData.getSize() + " 槽位");
+            lore.add("§f当前容量: " + formatProgressBar(pillData));
+        } else {
+            lore.add("§f丹瓶大小: §70/0 槽位");
+            lore.add("§f当前容量: §70% §8||||||||||||||||||||");
+        }
+
         return lore;
     }
 

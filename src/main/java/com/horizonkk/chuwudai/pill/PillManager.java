@@ -75,15 +75,16 @@ public class PillManager {
                             .replace("%id%", pillId)));
             return;
         }
-        
+
         try {
             PillInventory inventory = new PillInventory(pillData);
             inventory.open(player);
-            
+
             // 发送成功消息
             player.sendMessage(ColorUtils.translateColorCodes(Chuwudai.getInstance().getConfig().getString("messages.prefix", "&8[&6储物袋&8] &f") +
                     Chuwudai.getInstance().getConfig().getString("messages.pill-opened", "&a已打开丹瓶 %id%")
                             .replace("%id%", pillId)));
+            // 注意：打开时不更新Lore，只在关闭或内容改变时更新
         } catch (Exception e) {
             player.sendMessage(ColorUtils.translateColorCodes(Chuwudai.getInstance().getConfig().getString("messages.prefix", "&8[&6储物袋&8] &f") +
                     "&c打开丹瓶时发生错误，请联系管理员"));

@@ -99,25 +99,49 @@ public class PillInventory implements InventoryHolder {
             open(viewer);
         }
     }
-    
+
     public void saveItems() {
+        boolean changed = false;
+
         for (int slot = 0; slot < Math.min(pillData.getSize(), 54); slot++) {
-            ItemStack item = inventory.getItem(slot);
-            
-            if (item != null && pillData.isValidPillItem(item)) {
-                pillData.setItem(slot, item);
-            } else if (item != null && !pillData.isValidPillItem(item)) {
-                // 如果物品不是有效丹药，则移除
-                pillData.removeItem(slot);
-            } else if (item == null) {
-                pillData.removeItem(slot);
+            ItemStack currentItem = pillData.getItem(slot);
+            ItemStack inventoryItem = inventory.getItem(slot);
+
+            // 检查是否有变化
+            boolean itemChanged = false;
+
+            if (currentItem == null && inventoryItem == null) {
+                // 两个都是空，无变化
+                continue;
+            } else if (currentItem == null || inventoryItem == null) {
+                // 一个为空一个不为空，有变化
+                itemChanged = true;
+            } else {
+                // 两个都不为空，比较内容
+                if (!currentItem.isSimilar(inventoryItem) || currentItem.getAmount() != inventoryItem.getAmount()) {
+                    itemChanged = true;
+                }
+            }
+
+            if (itemChanged) {
+                if (inventoryItem != null && pillData.isValidPillItem(inventoryItem)) {
+                    pillData.setItem(slot, inventoryItem);
+                } else if (inventoryItem != null && !pillData.isValidPillItem(inventoryItem)) {
+                    // 如果物品不是有效丹药，则移除
+                    pillData.removeItem(slot);
+                } else if (inventoryItem == null) {
+                    pillData.removeItem(slot);
+                }
+                changed = true;
             }
         }
-        
-        // 保存数据
-        Chuwudai.getInstance().getPillManager().savePillData(pillData.getId());
+
+        // 只有在确实有变化时才保存
+        if (changed) {
+            // 保存数据
+            Chuwudai.getInstance().getPillManager().savePillData(pillData.getId());
+        }
     }
-    
     private boolean isControlItem(ItemStack item) {
         if (item == null || !item.hasItemMeta()) return false;
         
