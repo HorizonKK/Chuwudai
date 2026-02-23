@@ -9,11 +9,13 @@ import org.bukkit.inventory.ItemStack;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
+import java.util.WeakHashMap;
 
 public class BagManager {
 
     private final Random random = new Random();
-    private final Map<String, BagData> bagCache = new HashMap<>();
+    private final Map<String, BagData> bagCache = new WeakHashMap<>();
+
 
     // 生成8位随机ID
     public String generateBagId() {

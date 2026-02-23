@@ -52,7 +52,7 @@ public class PillData {
         }
         
         String displayName = item.getItemMeta().getDisplayName();
-        return displayName.contains("丹药") || displayName.contains("丹");
+        return displayName.contains("丹药");
     }
     
     // 更新丹药名称列表（前9格）

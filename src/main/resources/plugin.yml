@@ -5,7 +5,8 @@ api-version: '1.21'
 prefix: 储物
 authors: [ HorizonKK ]
 description: 储物袋功能插件
-
+depand:
+  - PlaceholderAPI
 commands:
   chuwudai:
     description: 储物袋主命令

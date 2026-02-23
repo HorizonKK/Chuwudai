@@ -3,6 +3,7 @@ package com.horizonkk.chuwudai;
 import com.horizonkk.chuwudai.bag.BagManager;
 import com.horizonkk.chuwudai.command.BagCommand;
 import com.horizonkk.chuwudai.data.BagDataManager;
+import com.horizonkk.chuwudai.hook.PlaceholderAPI;
 import com.horizonkk.chuwudai.listener.BagListener;
 import com.horizonkk.chuwudai.listener.BagOperationRestrictionListener;
 import com.horizonkk.chuwudai.listener.PillListener;
@@ -44,6 +45,15 @@ public final class Chuwudai extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new BagOperationRestrictionListener(), this);
         getServer().getPluginManager().registerEvents(new PillListener(), this);
         getServer().getPluginManager().registerEvents(new PillUseEvent(), this);
+
+        // 注册 PlaceholderAPI 扩展
+        if (getServer().getPluginManager().getPlugin("PlaceholderAPI") != null) {
+            new PlaceholderAPI(this).register();
+            getLogger().info("PlaceholderAPI 扩展已注册！");
+        } else {
+            getLogger().warning("PlaceholderAPI 未找到，变量功能将不可用！");
+        }
+
 
         // 异步加载数据
         getServer().getScheduler().runTaskAsynchronously(this, () -> {
