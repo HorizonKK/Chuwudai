@@ -1,6 +1,7 @@
 package com.horizonkk.chuwudai.bag;
 
 import com.horizonkk.chuwudai.Chuwudai;
+import com.horizonkk.chuwudai.utlis.BundleStyle;
 import com.horizonkk.chuwudai.utlis.ColorUtils;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
@@ -16,7 +17,6 @@ public class BagManager {
     private final Random random = new Random();
     private final Map<String, BagData> bagCache = new WeakHashMap<>();
 
-
     // 生成8位随机ID
     public String generateBagId() {
         String id;
@@ -26,14 +26,19 @@ public class BagManager {
         return id;
     }
 
-    // 创建储物袋物品
+    // 创建储物袋物品（无样式参数，使用默认棕色）
     public ItemStack createBagItem(int size) {
-        return BagItem.createBag(size, generateBagId());
+        return BagItem.createBag(size, generateBagId(), "brown"); // 默认棕色样式
     }
 
-    // 给予玩家储物袋
-    public void giveBagToPlayer(Player player, int size) {
-        ItemStack bag = createBagItem(size);
+    // 创建储物袋物品（指定样式）
+    public ItemStack createBagItem(int size, String style) {
+        return BagItem.createBag(size, generateBagId(), style);
+    }
+
+    // 给予玩家储物袋（指定样式）
+    public void giveBagToPlayer(Player player, int size, String style) {
+        ItemStack bag = createBagItem(size, style);
         String bagId = BagItem.getBagId(bag); // 获取新生成的ID
         // 创建空的储物袋数据并保存
         BagData emptyBagData = new BagData(bagId, size);
@@ -45,11 +50,23 @@ public class BagManager {
         }
 
         String bagType = getBagTypeName(size);
+        String styleName = getStyleChineseName(style);
         player.sendMessage(ColorUtils.translateColorCodes(Chuwudai.getInstance().getConfig().getString("messages.prefix", "&8[&6储物袋&8] &f") +
-                Chuwudai.getInstance().getConfig().getString("messages.bag-received", "&a你获得了一个 %type% &a(ID: %id%)")
+                Chuwudai.getInstance().getConfig().getString("messages.bag-received", "&a你获得了一个 %type% &a(ID: %id%, 样式: %style%)")
                         .replace("%type%", bagType)
-                        .replace("%id%", bagId)));
+                        .replace("%id%", bagId)
+                        .replace("%style%", styleName)));
     }
+
+    // 给予玩家储物袋（不指定样式，使用默认棕色）
+    public void giveBagToPlayer(Player player, int size) {
+        giveBagToPlayer(player, size, "brown"); // 调用带样式参数的方法，传入默认棕色
+    }
+
+    private String getStyleChineseName(String style) {
+        return BundleStyle.fromStyleName(style).getChineseName();
+    }
+
     // 根据大小获取储物袋类型名称
     private String getBagTypeName(int size) {
         ConfigurationSection bagTypes = Chuwudai.getInstance().getConfig().getConfigurationSection("bag-types");

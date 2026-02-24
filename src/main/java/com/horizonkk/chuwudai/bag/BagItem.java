@@ -1,6 +1,7 @@
 package com.horizonkk.chuwudai.bag;
 
 import com.horizonkk.chuwudai.Chuwudai;
+import com.horizonkk.chuwudai.utlis.BundleStyle;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.configuration.ConfigurationSection;
@@ -19,51 +20,56 @@ public class BagItem {
     private static final NamespacedKey BAG_ID_KEY = new NamespacedKey(Chuwudai.getInstance(), "bag_id");
     private static final NamespacedKey BAG_SIZE_KEY = new NamespacedKey(Chuwudai.getInstance(), "bag_size");
 
-    // 创建储物袋物品
-    public static ItemStack createBag(int size, String id) {
-        Material material = Material.CHEST; // 默认材质
-        int customModelData = 10021; // 默认自定义模型数据
-        // 从配置中获取材质信息
-        ConfigurationSection bagTypesSection = Chuwudai.getInstance().getConfig().getConfigurationSection("bag-types");
-        if (bagTypesSection != null) {
-            ConfigurationSection typeInfo = bagTypesSection.getConfigurationSection(String.valueOf(size));
-            if (typeInfo != null) {
-                String materialName = typeInfo.getString("material");
-                if (materialName != null) {
-                    try {
-                        material = Material.valueOf(materialName.toUpperCase());
-                    } catch (IllegalArgumentException e) {
-                        Chuwudai.getInstance().getLogger().warning("无效的材质名称: " + materialName + ", 使用默认材质");
-                    }
-                }
-
-                customModelData = typeInfo.getInt("custom-model-data", customModelData);
-            }
-        }
+    public static ItemStack createBag(int size, String id, String style) {
+        Material material = Material.PAPER; // 使用PAPER材质
+        int customModelData = getBundleCustomModelData(style); // 根据样式获取customModelData
         ItemStack item = new ItemStack(material, 1);
         ItemMeta meta = item.getItemMeta();
         // 设置名称
-        String name = "储物袋";
-        if (bagTypesSection != null) {
-            ConfigurationSection typeInfo = bagTypesSection.getConfigurationSection(String.valueOf(size));
-            if (typeInfo != null) {
-                name = typeInfo.getString("name", "储物袋");
-            }
-        }
+        String name = getStyledBagName(size, style);
         meta.setDisplayName(name.replace("&", "§"));
         // 创建完整的Lore
-        List<String> lore = createCompleteLore(id, size, new HashMap<>());
+        List<String> lore = createCompleteLore(id, size, style, new HashMap<>());
         meta.setLore(lore);
-        // 设置自定义模型数据（如果配置了）
+        // 设置自定义模型数据
         if (customModelData > 0) {
             meta.setCustomModelData(customModelData);
         }
+
         // 添加NBT数据
         PersistentDataContainer data = meta.getPersistentDataContainer();
         data.set(BAG_ID_KEY, PersistentDataType.STRING, id);
         data.set(BAG_SIZE_KEY, PersistentDataType.INTEGER, size);
+
         item.setItemMeta(meta);
         return item;
+    }
+
+    // 创建储物袋物品（不指定样式，使用默认棕色）
+    public static ItemStack createBag(int size, String id) {
+        return createBag(size, id, "brown"); // 调用带样式参数的方法，传入默认棕色
+    }
+
+    // 根据样式获取CustomModelData
+    private static int getBundleCustomModelData(String style) {
+        return BundleStyle.fromStyleName(style).getCustomModelData();
+    }
+
+    // 获取带样式的储物袋名称
+    private static String getStyledBagName(int size, String style) {
+        String baseName = getBaseBagName(size);
+        String styleColor = getStyleColorCode(style);
+        return styleColor + baseName;
+    }
+
+    // 获取基础储物袋名称
+    private static String getBaseBagName(int size) {
+        return "储物袋";
+    }
+
+    // 获取样式的颜色代码
+    private static String getStyleColorCode(String style) {
+        return BundleStyle.fromStyleName(style).getColorCode();
     }
 
     // 从物品获取储物袋ID
@@ -202,40 +208,36 @@ public class BagItem {
     }
 
     // 创建完整的储物袋Lore（用于新创建储物袋）
-    private static List<String> createCompleteLore(String bagId, int size, Map<String, Integer> stoneCounts) {
+    private static List<String> createCompleteLore(String bagId, int size, String style, Map<String, Integer> stoneCounts) {
         List<String> lore = new ArrayList<>();
-        // 获取配置中的bag-types信息
-        ConfigurationSection bagTypesSection = Chuwudai.getInstance().getConfig().getConfigurationSection("bag-types");
-        if (bagTypesSection != null) {
-            ConfigurationSection typeInfo = bagTypesSection.getConfigurationSection(String.valueOf(size));
-            if (typeInfo != null) {
-                List<String> baseLore = typeInfo.getStringList("lore");
-                for (String line : baseLore) {
-                    lore.add(line.replace("&", "§").replace("%id%", bagId));
-                }
-            } else {
-                // 默认Lore
-                lore.add("§7容量: " + size + "格");
-                lore.add("§8ID: " + bagId);
-            }
-        } else {
-            // 默认Lore
-            lore.add("§7容量: " + size + "格");
-            lore.add("§8ID: " + bagId);
-        }
+
+        // 添加样式信息作为第一行
+        String styleDisplayName = getStyleDisplayName(style);
+        String styleColor = getStyleColorCode(style);
+        lore.add("§7样式: " + styleColor + styleDisplayName);
+        lore.add("§8ID: " + bagId);
+
         // 添加操作提示
         lore.add("§8可通过置于背包的储物袋槽位中右键点击打开储物袋");
         lore.add("");
+
         // 添加灵石存储信息
         lore.add("§7当前存储:");
         lore.add("  §f下品灵石: §70");
         lore.add("  §a中品灵石: §70");
         lore.add("  §e上品灵石: §70");
         lore.add("  §c极品灵石: §70");
+
         // 添加容量信息
         lore.add("");
         lore.add("§f储物大小: §70/" + size + " 槽位");
         lore.add("§f当前容量: §70% §8||||||||||||||||||||");
+
         return lore;
     }
+
+    private static String getStyleDisplayName(String style) {
+        return BundleStyle.fromStyleName(style).getChineseName();
+    }
+
 }

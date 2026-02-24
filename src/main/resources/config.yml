@@ -94,4 +94,4 @@ ui:
   page-next: "&a下一页 →"
   page-prev: "&c← 上一页"
   close-button: "&c关闭"
-  current-page: "&7第 %page% 页 / %total% 页"
+  current-page: "&7第 &f%page% &7页 &8/ &f%total% &7页"

@@ -163,7 +163,10 @@ public class BagData {
     
     public String getId() { return id; }
     public int getSize() { return size; }
-    public int getTotalPages() { return (int) Math.ceil((double) size / 45.0); }
+    public int getTotalPages() {
+        // 每页实际存储45格，计算需要多少页
+        return (int) Math.ceil((double) size / 45);
+    }
 
     public Map<Integer, ItemStack> getAllItems() {
         return new HashMap<>(items);

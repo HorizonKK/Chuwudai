@@ -33,18 +33,27 @@ public class BagInventory implements InventoryHolder {
     private void createInventory() {
         int totalPages = bagData.getTotalPages();
         int actualSize = bagData.getSize();
-        // 对于小容量储物袋，使用合适的界面大小
-        int inventorySize;
-        if (actualSize <= 27) {
-            // 小型储物袋：3排存储 + 1排控制 = 4排 = 36格
-            inventorySize = 36;
-        } else if (actualSize <= 45) {
-            // 中型储物袋：5排存储 + 1排控制 = 6排 = 54格
-            inventorySize = 54;
-        } else {
-            // 大型储物袋：统一使用54格界面
-            inventorySize = 54;
-        }
+
+        // 计算当前页的起始和结束位置
+        int pageStart = currentPage * 45;
+        int pageEnd = Math.min(pageStart + 45, actualSize);
+        int currentPageStorageCount = pageEnd - pageStart;
+
+        // 计算当前页需要的存储行数（每行9格）
+        int storageRows = (int) Math.ceil((double) currentPageStorageCount / 9);
+
+        // 计算总界面大小（存储行数 + 1排控制栏）
+        int inventorySize = (storageRows + 1) * 9;
+
+        // 但要确保不超过Bukkit的最大限制（通常是54格）
+        inventorySize = Math.min(inventorySize, 54);
+
+        // 移除多页强制54格的限制，让所有页面都根据实际存储格数动态计算
+    /*
+    if (totalPages > 1) {
+        inventorySize = 54;
+    }
+    */
         inventory = Bukkit.createInventory(this, inventorySize, "储物袋 #" + bagData.getId() + " (第 " + (currentPage + 1) + " 页)");
         loadItems();
         addControlButtons();
@@ -52,13 +61,14 @@ public class BagInventory implements InventoryHolder {
 
     private void loadItems() {
         slotMapping.clear();
-        int startSlot = currentPage * ITEMS_PER_PAGE;
-        int endSlot = Math.min(startSlot + ITEMS_PER_PAGE, bagData.getSize());
-        // 计算实际可用的存储格子数量
-        int storageRows = (inventory.getSize() - 9) / 9; // 减去控制栏的1排
-        int maxStorageSlots = storageRows * 9;
-        for (int i = startSlot; i < endSlot && i < maxStorageSlots; i++) {
-            int invSlot = i - startSlot;
+        int pageStart = currentPage * 45;
+        int pageEnd = Math.min(pageStart + 45, bagData.getSize());
+
+        // 计算可用的存储槽位数（控制栏始终在最后）
+        int maxStorageSlots = inventory.getSize() - 9;
+
+        for (int i = pageStart; i < pageEnd && (i - pageStart) < maxStorageSlots; i++) {
+            int invSlot = i - pageStart;
             slotMapping.put(invSlot, i);
 
             ItemStack item = bagData.getItem(i);
@@ -67,26 +77,29 @@ public class BagInventory implements InventoryHolder {
             }
         }
     }
+
     private void addControlButtons() {
         int totalPages = bagData.getTotalPages();
         int inventorySize = inventory.getSize();
-        int controlStart = inventorySize - 9; // 控制栏始终在最后1排
+
+        // 计算控制栏起始位置（始终在最后）
+        int controlStart = inventorySize - 9;
 
         // 清除控制栏区域
-        for (int i = controlStart; i < inventorySize; i++) {
+        for (int i = controlStart; i < Math.min(controlStart + 9, inventorySize); i++) {
             inventory.setItem(i, null);
         }
 
         // 添加玻璃板分隔线（除了按钮位置）
         ItemStack glassPane = createGlassPane();
-        for (int i = controlStart; i < inventorySize; i++) {
-            // 排除按钮位置
-            if (i != controlStart && i != controlStart + 2 && i != controlStart + 3 && i != inventorySize - 1) {
+        for (int i = controlStart; i < Math.min(controlStart + 9, inventorySize); i++) {
+            // 排除按钮位置：最左、中、最右
+            if (i != controlStart && i != controlStart + 4 && i != Math.min(controlStart + 8, inventorySize - 1)) {
                 inventory.setItem(i, glassPane);
             }
         }
 
-        // 上一页按钮
+        // 上一页按钮（最左侧）
         if (currentPage > 0) {
             ItemStack prevButton = createButton(
                     Material.ARROW,
@@ -94,34 +107,42 @@ public class BagInventory implements InventoryHolder {
                     Arrays.asList("§7点击切换到上一页")
             );
             inventory.setItem(controlStart, prevButton);
+        } else {
+            // 不需要上一页时显示玻璃板
+            inventory.setItem(controlStart, glassPane);
         }
 
-        // 页码显示
+        // 页码和储物袋信息（中间）- 添加颜色处理
+        int pageStart = currentPage * 45;
+        int pageEnd = Math.min(pageStart + 45, bagData.getSize());
+        int currentPageStorageCount = pageEnd - pageStart;
+
+        String pageTitle = Chuwudai.getInstance().getConfig().getString("ui.current-page", "&7第 %page% 页 / %total% 页")
+                .replace("%page%", String.valueOf(currentPage + 1))
+                .replace("%total%", String.valueOf(totalPages));
+
         ItemStack pageInfo = createButton(
-                Material.PAPER,
-                Chuwudai.getInstance().getConfig().getString("ui.current-page", "&7第 %page% 页 / %total% 页")
-                        .replace("%page%", String.valueOf(currentPage + 1))
-                        .replace("%total%", String.valueOf(totalPages)),
-                null
+                Material.BOOK,
+                pageTitle, // 已经包含颜色代码
+                Arrays.asList(
+                        com.horizonkk.chuwudai.utlis.ColorUtils.translateColorCodes("&7总容量: &f" + bagData.getSize() + " 格"),
+                        com.horizonkk.chuwudai.utlis.ColorUtils.translateColorCodes("&7当前页存储: &f" + currentPageStorageCount + " 格"),
+                        com.horizonkk.chuwudai.utlis.ColorUtils.translateColorCodes("&7存储物品: &f" + bagData.getUsedSlots() + " 个")
+                )
         );
-        inventory.setItem(controlStart + 2, pageInfo);
+        inventory.setItem(controlStart + 4, pageInfo);
 
-        // 关闭按钮
-        ItemStack closeButton = createButton(
-                Material.BARRIER,
-                Chuwudai.getInstance().getConfig().getString("ui.close-button", "&c关闭"),
-                Arrays.asList("§7点击关闭储物袋")
-        );
-        inventory.setItem(controlStart + 3, closeButton);
-
-        // 下一页按钮
+        // 下一页按钮（最右侧）
         if (currentPage < totalPages - 1) {
             ItemStack nextButton = createButton(
                     Material.ARROW,
                     Chuwudai.getInstance().getConfig().getString("ui.page-next", "&a下一页 →"),
                     Arrays.asList("§7点击切换到下一页")
             );
-            inventory.setItem(inventorySize - 1, nextButton);
+            inventory.setItem(Math.min(controlStart + 8, inventorySize - 1), nextButton);
+        } else {
+            // 不需要下一页时显示玻璃板
+            inventory.setItem(Math.min(controlStart + 8, inventorySize - 1), glassPane);
         }
     }
 
@@ -136,10 +157,16 @@ public class BagInventory implements InventoryHolder {
     private ItemStack createButton(Material material, String name, java.util.List<String> lore) {
         ItemStack item = new ItemStack(material);
         ItemMeta meta = item.getItemMeta();
-        meta.setDisplayName(name.replace("&", "§"));
+        // 使用ColorUtils处理颜色代码
+        meta.setDisplayName(com.horizonkk.chuwudai.utlis.ColorUtils.translateColorCodes(name));
 
         if (lore != null) {
-            meta.setLore(lore);
+            // 处理Lore中的颜色代码
+            java.util.List<String> coloredLore = new java.util.ArrayList<>();
+            for (String line : lore) {
+                coloredLore.add(com.horizonkk.chuwudai.utlis.ColorUtils.translateColorCodes(line));
+            }
+            meta.setLore(coloredLore);
         }
 
         item.setItemMeta(meta);
@@ -153,24 +180,31 @@ public class BagInventory implements InventoryHolder {
     public boolean isControlSlot(int slot) {
         int inventorySize = inventory.getSize();
         int controlStart = inventorySize - 9;
-        // 控制栏范围：最后9个格子
-        return slot >= controlStart && slot < inventorySize;
+        // 控制栏范围，包含所有控制按钮（包括中间的书籍按钮）
+        return (slot >= controlStart && slot < inventorySize);
     }
 
     public void handleControlClick(int slot) {
-        if (slot == 45 && currentPage > 0) {
+        int totalPages = bagData.getTotalPages();
+        int inventorySize = inventory.getSize();
+        int controlStart = inventorySize - 9;
+
+        // 检查是否点击了页码信息按钮（中间位置）
+        if (slot == controlStart + 4) {
+            // 页码信息按钮不处理任何操作，直接返回
+            return;
+        }
+
+        if (slot == controlStart && currentPage > 0) {
             // 上一页
             currentPage--;
             refresh();
-        } else if (slot == 53 && currentPage < bagData.getTotalPages() - 1) {
+        } else if (slot == Math.min(controlStart + 8, inventorySize - 1) && currentPage < totalPages - 1) {
             // 下一页
             currentPage++;
             refresh();
-        } else if (slot == 48) {
-            // 关闭
-            Player viewer = (Player) inventory.getViewers().get(0);
-            viewer.closeInventory();
         }
+        // 其他控制槽位（包括中间书籍按钮周围）不处理任何操作
     }
 
     public void refresh() {
