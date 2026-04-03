@@ -33,27 +33,16 @@ public class BagInventory implements InventoryHolder {
     private void createInventory() {
         int totalPages = bagData.getTotalPages();
         int actualSize = bagData.getSize();
-
         // 计算当前页的起始和结束位置
         int pageStart = currentPage * 45;
         int pageEnd = Math.min(pageStart + 45, actualSize);
         int currentPageStorageCount = pageEnd - pageStart;
-
         // 计算当前页需要的存储行数（每行9格）
         int storageRows = (int) Math.ceil((double) currentPageStorageCount / 9);
-
         // 计算总界面大小（存储行数 + 1排控制栏）
         int inventorySize = (storageRows + 1) * 9;
-
         // 但要确保不超过Bukkit的最大限制（通常是54格）
-        inventorySize = Math.min(inventorySize, 54);
-
-        // 移除多页强制54格的限制，让所有页面都根据实际存储格数动态计算
-    /*
-    if (totalPages > 1) {
-        inventorySize = 54;
-    }
-    */
+//        inventorySize = Math.min(inventorySize, 54);
         inventory = Bukkit.createInventory(this, inventorySize, "储物袋 #" + bagData.getId() + " (第 " + (currentPage + 1) + " 页)");
         loadItems();
         addControlButtons();
@@ -64,9 +53,12 @@ public class BagInventory implements InventoryHolder {
         int pageStart = currentPage * 45;
         int pageEnd = Math.min(pageStart + 45, bagData.getSize());
 
+        // 计算当前页实际的存储槽数量
+        int currentPageStorageCount = pageEnd - pageStart;
         // 计算可用的存储槽位数（控制栏始终在最后）
         int maxStorageSlots = inventory.getSize() - 9;
 
+        // 先放置实际的物品
         for (int i = pageStart; i < pageEnd && (i - pageStart) < maxStorageSlots; i++) {
             int invSlot = i - pageStart;
             slotMapping.put(invSlot, i);
@@ -76,6 +68,25 @@ public class BagInventory implements InventoryHolder {
                 inventory.setItem(invSlot, item);
             }
         }
+
+        // 然后将超出实际存储数量的槽位用黑色玻璃板填充
+        ItemStack lockedGlassPane = createLockedGlassPane();
+        for (int i = currentPageStorageCount; i < maxStorageSlots; i++) {
+            inventory.setItem(i, lockedGlassPane);
+        }
+    }
+
+    // 创建未解锁行的玻璃板
+    private ItemStack createLockedGlassPane() {
+        ItemStack glass = new ItemStack(Material.BLACK_STAINED_GLASS_PANE);
+        ItemMeta meta = glass.getItemMeta();
+        meta.setDisplayName(com.horizonkk.chuwudai.utlis.ColorUtils.translateColorCodes("&c当前未解锁该行 取消点击"));
+        meta.setLore(Arrays.asList(
+                com.horizonkk.chuwudai.utlis.ColorUtils.translateColorCodes("&7该行槽位尚未解锁"),
+                com.horizonkk.chuwudai.utlis.ColorUtils.translateColorCodes("&7请升级储物袋以解锁更多存储空间")
+        ));
+        glass.setItemMeta(meta);
+        return glass;
     }
 
     private void addControlButtons() {
@@ -246,7 +257,8 @@ public class BagInventory implements InventoryHolder {
                         displayName.contains("下一页") ||
                         displayName.contains("关闭") ||
                         displayName.contains("第") && displayName.contains("页") ||
-                        displayName.equals(" ") // 玻璃板
+                        displayName.equals(" ") || // 普通玻璃板
+                        displayName.contains("当前未解锁该行") // 未解锁玻璃板
         );
     }
 

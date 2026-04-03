@@ -12,6 +12,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.*;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
@@ -89,10 +90,15 @@ public class BagListener implements Listener {
     public void onInventoryClickInBag(InventoryClickEvent event) {
         if (event.getInventory().getHolder() instanceof BagInventory) {
             BagInventory bagInventory = (BagInventory) event.getInventory().getHolder();
-            // 检查是否是控制按钮
-            if (bagInventory.isControlSlot(event.getSlot())) {
+            // 根据物品名称判断是否是控制按钮，而不是依赖槽位索引
+            ItemStack clickedItem = event.getCurrentItem();
+            if (isControlButtonItem(clickedItem)) {
                 event.setCancelled(true);
-                bagInventory.handleControlClick(event.getSlot());
+                // 找到对应的控制槽位并处理点击
+                int slot = findControlSlotByItem(bagInventory.getInventory(), clickedItem);
+                if (slot != -1) {
+                    bagInventory.handleControlClick(slot);
+                }
                 return;
             }
             // 异步保存数据
@@ -109,6 +115,39 @@ public class BagListener implements Listener {
                 }
             });
         }
+    }
+
+    // 根据物品名称判断是否是控制按钮
+    private boolean isControlButtonItem(ItemStack item) {
+        if (item == null || !item.hasItemMeta()) return false;
+
+        String displayName = item.getItemMeta().getDisplayName();
+        return displayName != null && (
+                displayName.contains("上一页") ||
+                        displayName.contains("下一页") ||
+                        displayName.contains("关闭") ||
+                        displayName.contains("第") && displayName.contains("页") ||
+                        displayName.equals(" ") || // 普通玻璃板
+                        displayName.contains("当前未解锁该行") // 未解锁玻璃板
+        );
+    }
+
+    // 根据物品在库存中找到对应的槽位
+    private int findControlSlotByItem(Inventory inventory, ItemStack targetItem) {
+        if (targetItem == null || !targetItem.hasItemMeta()) return -1;
+
+        String targetName = targetItem.getItemMeta().getDisplayName();
+
+        for (int i = 0; i < inventory.getSize(); i++) {
+            ItemStack item = inventory.getItem(i);
+            if (item != null && item.hasItemMeta() && item.getItemMeta().hasDisplayName()) {
+                String itemName = item.getItemMeta().getDisplayName();
+                if (itemName.equals(targetName)) {
+                    return i;
+                }
+            }
+        }
+        return -1;
     }
 
     @EventHandler

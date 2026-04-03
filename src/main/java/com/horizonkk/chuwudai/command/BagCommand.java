@@ -1,6 +1,7 @@
 package com.horizonkk.chuwudai.command;
 
 import com.horizonkk.chuwudai.Chuwudai;
+import com.horizonkk.chuwudai.api.ChuwudaiAPI;
 import com.horizonkk.chuwudai.bag.BagManager;
 import com.horizonkk.chuwudai.utlis.BundleStyle;
 import com.horizonkk.chuwudai.utlis.ColorUtils;
@@ -164,11 +165,110 @@ public class BagCommand implements CommandExecutor {
                 // 测试物品匹配
                 testStoneMatch(player2, item);
                 break;
+            case "deductstone":
+                if (!sender.hasPermission("chuwudai.test")) {
+                    sender.sendMessage(prefix + Chuwudai.getInstance().getConfig().getString("messages.no-permission", "&c你没有权限！"));
+                    return true;
+                }
+                if (!(sender instanceof Player)) {
+                    sender.sendMessage(prefix + "&c只有玩家才能使用此命令！");
+                    return true;
+                }
+                if (args.length < 4) {
+                    sender.sendMessage(prefix + "&c用法: &e/chuwudai deductstone <槽位> <灵石类型> <数量>");
+                    sender.sendMessage(prefix + "&7示例: &f/chuwudai deductstone 9 下品灵石 5");
+                    sender.sendMessage(prefix + "&7槽位: 储物袋在背包中的槽位(0-35)");
+                    sender.sendMessage(prefix + "&7灵石类型: 下品灵石, 中品灵石, 上品灵石, 极品灵石");
+                    return true;
+                }
+                Player player3 = (Player) sender;
+                try {
+                    int bagSlot = Integer.parseInt(args[1]);
+                    String stoneType = args[2];
+                    int amount = Integer.parseInt(args[3]);
+
+                    // 验证槽位范围
+                    if (bagSlot < 0 || bagSlot > 35) {
+                        player3.sendMessage(prefix + "&c槽位必须在0-35之间！");
+                        return true;
+                    }
+
+                    // 验证灵石类型
+                    if (!isValidStoneType(stoneType)) {
+                        player3.sendMessage(prefix + "&c无效的灵石类型！");
+                        player3.sendMessage(prefix + "&7可用类型: 下品灵石, 中品灵石, 上品灵石, 极品灵石");
+                        return true;
+                    }
+
+                    // 执行扣除测试
+                    testDeductStone(player3, bagSlot, stoneType, amount);
+                } catch (NumberFormatException e) {
+                    player3.sendMessage(prefix + "&c槽位和数量必须是数字！");
+                }
+                break;
             default:
                 sendHelp(sender);
                 break;
         }
         return true;
+    }
+
+    /**
+     * 验证灵石类型是否有效
+     */
+    private boolean isValidStoneType(String stoneType) {
+        return stoneType.equals("下品灵石") ||
+                stoneType.equals("中品灵石") ||
+                stoneType.equals("上品灵石") ||
+                stoneType.equals("极品灵石");
+    }
+
+    /**
+     * 测试扣除灵石功能 - 调用 ChuwudaiAPI 进行测试
+     */
+    private void testDeductStone(Player player, int bagSlot, String stoneType, int amount) {
+        String prefix = Chuwudai.getInstance().getConfig().getString("messages.prefix", "&8[&6储物袋&8] &f");
+
+        player.sendMessage(prefix + "&6=== 灵石扣除测试 ===");
+        player.sendMessage(prefix + "&7槽位: &f" + bagSlot);
+        player.sendMessage(prefix + "&7灵石类型: &f" + stoneType);
+        player.sendMessage(prefix + "&7扣除数量: &f" + amount);
+
+        // 将中文灵石类型转换为API所需的格式
+        String apiStoneType = convertStoneTypeToAPIFormat(stoneType);
+
+        if (apiStoneType == null) {
+            player.sendMessage(prefix + "&c无效的灵石类型！");
+            return;
+        }
+
+        // 调用 ChuwudaiAPI 的扣除方法
+        ChuwudaiAPI.StoneDeductionResult result = ChuwudaiAPI.deductStoneFromSpecificBag(player, bagSlot, apiStoneType, amount);
+
+        // 显示测试结果
+        player.sendMessage(prefix + "&6--- 测试结果 ---");
+        player.sendMessage(prefix + "&7扣除结果: " + (result.isSuccess() ? "&a成功" : "&c失败"));
+        player.sendMessage(prefix + "&7实际扣除数量: &f" + result.getDeductedAmount());
+        player.sendMessage(prefix + "&7消息: &f" + result.getMessage());
+
+        if (result.isSuccess()) {
+            player.sendMessage(prefix + "&a✓ 灵石扣除测试通过！");
+        } else {
+            player.sendMessage(prefix + "&c✗ 灵石扣除测试失败！");
+        }
+    }
+
+    /**
+     * 将中文灵石类型转换为API格式
+     */
+    private String convertStoneTypeToAPIFormat(String chineseType) {
+        switch (chineseType) {
+            case "下品灵石": return "&f下品灵石";
+            case "中品灵石": return "&a中品灵石";
+            case "上品灵石": return "&e上品灵石";
+            case "极品灵石": return "&c极品灵石";
+            default: return null;
+        }
     }
 
     private boolean isValidStyle(String style) {
