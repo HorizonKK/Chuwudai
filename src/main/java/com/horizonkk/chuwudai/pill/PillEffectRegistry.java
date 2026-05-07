@@ -29,7 +29,7 @@ public class PillEffectRegistry {
 
         // 遍历所有已注册的效果类型
         for (PillEffectType effectType : PillEffectType.values()) {
-            NamespacedKey key = new NamespacedKey(Chuwudai.getInstance(), effectType.getNbtKey());
+            NamespacedKey key = new NamespacedKey("liandan", effectType.getNbtKey());
 
             if (container.has(key, PersistentDataType.INTEGER)) {
                 int value = container.get(key, PersistentDataType.INTEGER);
@@ -65,7 +65,7 @@ public class PillEffectRegistry {
             return false;
         }
 
-        NamespacedKey key = new NamespacedKey(Chuwudai.getInstance(), effectType.getNbtKey());
+        NamespacedKey key = new NamespacedKey("liandan", effectType.getNbtKey());
         PersistentDataContainer container = item.getItemMeta().getPersistentDataContainer();
 
         return container.has(key, PersistentDataType.INTEGER);
@@ -79,7 +79,7 @@ public class PillEffectRegistry {
             return 0;
         }
 
-        NamespacedKey key = new NamespacedKey(Chuwudai.getInstance(), effectType.getNbtKey());
+        NamespacedKey key = new NamespacedKey("liandan", effectType.getNbtKey());
         PersistentDataContainer container = item.getItemMeta().getPersistentDataContainer();
 
         if (container.has(key, PersistentDataType.INTEGER)) {

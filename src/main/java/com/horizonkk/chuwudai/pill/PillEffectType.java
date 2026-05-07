@@ -24,13 +24,13 @@ public enum PillEffectType {
 
     // ===== 毒性类 =====
     DAN_DU("dan_yao_dandu", "丹毒", new PoisonHandler()),
-    JIAN_DAN_DU("dan_yao_jiandandu", "减丹毒", new ReducePoisonHandler());
+    JIAN_DAN_DU("dan_yao_jiandandu", "减丹毒", new ReducePoisonHandler()),
 
     // ===== 临时增益类 =====
-//    LIN_SHI_DAMAGE("dan_yao_linshi_damage", "临时物伤", new TempDamageHandler()),
-//    LIN_SHI_WU_KANG("dan_yao_linshi_wukang", "临时物抗", new TempPhysicalDefenseHandler()),
-//    LIN_SHI_FA_KANG("dan_yao_linshi_fakang", "临时法抗", new TempMagicDefenseHandler()),
-//    LIN_SHI_WU_XING_KANG("dan_yao_linshi_wuxingkang", "临时五行抗性", new TempElementalDefenseHandler());
+    LIN_SHI_DAMAGE("dan_yao_linshi_damage", "临时物伤", new TempDamageHandler()),
+    LIN_SHI_WU_KANG("dan_yao_linshi_wukang", "临时物抗", new TempPhysicalDefenseHandler()),
+    LIN_SHI_FA_KANG("dan_yao_linshi_fakang", "临时法抗", new TempMagicDefenseHandler()),
+    LIN_SHI_WU_XING_KANG("dan_yao_linshi_wuxingkang", "临时五行抗性", new TempElementalDefenseHandler());
 
     private final String nbtKey;
     private final String displayName;
