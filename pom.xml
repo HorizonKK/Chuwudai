@@ -88,5 +88,12 @@
             <version>5.0.1</version>
             <scope>provided</scope>
         </dependency>
+        <dependency>
+            <groupId>com.horizonkk.hoXiuLian</groupId>
+            <artifactId>HoXiuLian</artifactId>
+            <version>1.0-SNAPSHOT</version>
+            <scope>system</scope>
+            <systemPath>${project.basedir}/libs/hoXiuLian-1.0-SNAPSHOT.jar</systemPath>
+        </dependency>
     </dependencies>
 </project>

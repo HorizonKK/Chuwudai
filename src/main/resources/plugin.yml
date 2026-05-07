@@ -7,6 +7,8 @@ authors: [ HorizonKK ]
 description: 储物袋功能插件
 depand:
   - PlaceholderAPI
+softdepend:
+  - HoXiuLian
 commands:
   chuwudai:
     description: 储物袋主命令
