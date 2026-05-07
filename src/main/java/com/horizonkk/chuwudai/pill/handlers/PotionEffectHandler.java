@@ -39,6 +39,32 @@ public class PotionEffectHandler implements PillEffectHandler {
     public void execute(Player player, int value) {
     }
 
+    public static boolean hasAnyPotionEffect(ItemStack item) {
+        if (!item.hasItemMeta()) {
+            return false;
+        }
+
+        PersistentDataContainer container = item.getItemMeta().getPersistentDataContainer();
+
+        for (String effectName : EFFECT_TYPE_MAP.keySet()) {
+            for (int amplifier = 0; amplifier <= 10; amplifier++) {
+                String nbtKey;
+                if (amplifier == 0) {
+                    nbtKey = "effect_" + effectName.toLowerCase() + "_time";
+                } else {
+                    nbtKey = "effect_" + effectName.toLowerCase() + "_time_" + amplifier;
+                }
+
+                NamespacedKey key = new NamespacedKey("liandan", nbtKey);
+                if (container.has(key, PersistentDataType.INTEGER)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     public static void applyPotionEffects(Player player, ItemStack pillItem) {
         if (!pillItem.hasItemMeta()) {
             return;

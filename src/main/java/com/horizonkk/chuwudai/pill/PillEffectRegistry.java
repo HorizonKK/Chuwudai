@@ -72,6 +72,26 @@ public class PillEffectRegistry {
     }
 
     /**
+     * 检查物品是否包含任何丹药效果（枚举效果或药水效果）
+     */
+    public static boolean hasAnyEffect(ItemStack item) {
+        if (!item.hasItemMeta()) {
+            return false;
+        }
+
+        PersistentDataContainer container = item.getItemMeta().getPersistentDataContainer();
+
+        for (PillEffectType type : PillEffectType.values()) {
+            NamespacedKey key = new NamespacedKey("liandan", type.getNbtKey());
+            if (container.has(key, PersistentDataType.INTEGER)) {
+                return true;
+            }
+        }
+
+        return PotionEffectHandler.hasAnyPotionEffect(item);
+    }
+
+    /**
      * 获取物品的指定效果值
      */
     public static int getEffectValue(ItemStack item, PillEffectType effectType) {

@@ -20,7 +20,12 @@ public class PillUseEvent implements Listener {
     public void onPlayerConsumeItem(PlayerItemConsumeEvent event) {
         Player player = event.getPlayer();
         ItemStack item = event.getItem();
-        if (item != null && PillItem.isPillItem(item)) {
+        if (item == null) {
+            return;
+        }
+
+        // 丹瓶：从丹瓶中取第一颗丹药服用
+        if (PillItem.isPillItem(item)) {
             event.setCancelled(true);
             String pillId = PillItem.getPillId(item);
             if (pillId != null) {
@@ -60,12 +65,49 @@ public class PillUseEvent implements Listener {
                     }
                 }
             }
+            return;
+        }
+
+        // 直接吃丹药（物品自身带有 liandan NBT 效果）
+        if (PillEffectRegistry.hasAnyEffect(item)) {
+            event.setCancelled(true);
+            executePillEffect(player, item);
+
+            consumeHeldItem(player, item);
+
+            String pillName = item.hasItemMeta() ?
+                    item.getItemMeta().getDisplayName() :
+                    item.getType().name();
+            player.sendMessage(ColorUtils.translateColorCodes(
+                    Chuwudai.getInstance().getConfig().getString("messages.prefix", "&8[&6储物袋&8] &f") +
+                            "&a服用丹药: &f" + pillName + " &a成功"));
         }
     }
 
 
     private void executePillEffect(Player player, ItemStack pillItem) {
         PillEffectRegistry.executeAllEffects(player, pillItem);
+    }
+
+    private void consumeHeldItem(Player player, ItemStack consumed) {
+        PlayerInventory inventory = player.getInventory();
+        ItemStack mainHand = inventory.getItemInMainHand();
+        if (mainHand == consumed || mainHand.equals(consumed)) {
+            if (mainHand.getAmount() > 1) {
+                mainHand.setAmount(mainHand.getAmount() - 1);
+            } else {
+                inventory.setItemInMainHand(null);
+            }
+            return;
+        }
+        ItemStack offHand = inventory.getItemInOffHand();
+        if (offHand == consumed || offHand.equals(consumed)) {
+            if (offHand.getAmount() > 1) {
+                offHand.setAmount(offHand.getAmount() - 1);
+            } else {
+                inventory.setItemInOffHand(null);
+            }
+        }
     }
 
     private void updatePillItemLore(ItemStack pillItem, PillData pillData, Player player) {
