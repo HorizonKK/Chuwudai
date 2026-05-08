@@ -34,9 +34,17 @@ public class PillEffectRegistry {
             if (container.has(key, PersistentDataType.INTEGER)) {
                 int value = container.get(key, PersistentDataType.INTEGER);
 
+                // 检查是否有持续时间配置
+                NamespacedKey durationKey = new NamespacedKey("liandan", effectType.getNbtKey() + "_duration");
+                int duration = 0;
+                if (container.has(durationKey, PersistentDataType.INTEGER)) {
+                    duration = container.get(durationKey, PersistentDataType.INTEGER);
+                }
+
                 try {
-                    effectType.getHandler().execute(player, value);
-                    appliedEffects.add(effectType.getDisplayName() + "+" + value);
+                    effectType.getHandler().execute(player, value, duration);
+                    appliedEffects.add(effectType.getDisplayName() + "+" + value
+                            + (duration > 0 ? "(" + duration + "秒)" : ""));
                 } catch (Exception e) {
                     Chuwudai.getInstance().getLogger().warning(
                             "执行丹药效果失败: " + effectType.getNbtKey() + ", 错误: " + e.getMessage()
