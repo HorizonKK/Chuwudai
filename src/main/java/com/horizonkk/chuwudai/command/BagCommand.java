@@ -17,10 +17,10 @@ import java.util.Arrays;
 import java.util.List;
 
 public class BagCommand implements CommandExecutor {
-    
+
     private final BagManager bagManager;
     private final getSize getSize;
-    
+
     public BagCommand() {
         this.bagManager = Chuwudai.getInstance().getBagManager();
         this.getSize = new getSize();
@@ -46,7 +46,7 @@ public class BagCommand implements CommandExecutor {
                     sender.sendMessage(ColorUtils.translateColorCodes("&7示例: &f/chuwudai give Steve bag 27 blue"));
                     sender.sendMessage(ColorUtils.translateColorCodes("&7类型: &fbag&7(储物袋) 或 &fpill&7(丹瓶)"));
                     sender.sendMessage(ColorUtils.translateColorCodes("&7样式: &fblue&7, &fbrown&7, &fcyan&7, &fgray&7, &fgreen&7, &flight_blue&7, &flight_gray&7, &flime&7, &fmagenta&7, &forange&7, &fpink&7, &fpurple&7, &fred&7, &fwhite&7, &fyellow"));
-                    sender.sendMessage(ColorUtils.translateColorCodes("&7注意: 样式为可选参数，默认为 &fbrown"));
+                    sender.sendMessage(ColorUtils.translateColorCodes("&7注意: 样式为可选参数，不指定时随机选择颜色"));
                     return true;
                 }
                 Player target = Bukkit.getPlayer(args[1]);
@@ -58,34 +58,35 @@ public class BagCommand implements CommandExecutor {
                 String type = args[2].toLowerCase();
                 try {
                     int size = Integer.parseInt(args[3]);
-                    String style = "brown"; // 默认样式
-
-                    // 如果提供了样式参数
-                    if (args.length >= 5) {
-                        style = args[4].toLowerCase();
-                        if (!isValidStyle(style)) {
-                            sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&c无效的样式！&7可用样式: &fblue&7, &fbrown&7, &fcyan&7, &fgray&7, &fgreen&7, &flight_blue&7, &flight_gray&7, &flime&7, &fmagenta&7, &forange&7, &fpink&7, &fpurple&7, &fred&7, &fwhite&7, &fyellow"));
-                            return true;
-                        }
-                    }
 
                     if (type.equals("bag") || type.equals("储物袋")) {
-                        // 验证储物袋大小：必须是9的倍数且大于0
                         if (size <= 0 || size % 9 != 0) {
                             sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&c储物袋大小必须是9的倍数且大于0！"));
                             sender.sendMessage(ColorUtils.translateColorCodes("&7有效大小: &f9&7, &f18&7, &f27&7, &f36&7, &f45&7, &f54&7, &f63&7, &f72&7..."));
                             sender.sendMessage(ColorUtils.translateColorCodes("&7分页说明: 每页最多45格存储，超出部分自动分页"));
                             return true;
                         }
-                        // 可以添加最大限制检查
-                        if (size > 540) { // 限制最大60排
+                        if (size > 540) {
                             sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&c储物袋大小不能超过540格！&7(最大60排)"));
                             return true;
                         }
-                        bagManager.giveBagToPlayer(target, size, style);
-                        sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&a已成功给予玩家 &e" + target.getName() + " &a一个 &b" + getSize.getBagSizeName(size) + "储物袋&a(&e" + size + "格&a, &e" + getStyleChineseName(style) + "&a样式)"));
+
+                        String styleName;
+                        if (args.length >= 5) {
+                            String style = args[4].toLowerCase();
+                            if (!isValidStyle(style)) {
+                                sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&c无效的样式！&7可用样式: &fblue&7, &fbrown&7, &fcyan&7, &fgray&7, &fgreen&7, &flight_blue&7, &flight_gray&7, &flime&7, &fmagenta&7, &forange&7, &fpink&7, &fpurple&7, &fred&7, &fwhite&7, &fyellow"));
+                                return true;
+                            }
+                            styleName = getStyleChineseName(style);
+                            bagManager.giveBagToPlayer(target, size, style);
+                        } else {
+                            styleName = "随机";
+                            bagManager.giveBagToPlayer(target, size);
+                        }
+
+                        sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&a已成功给予玩家 &e" + target.getName() + " &a一个 &b" + getSize.getBagSizeName(size) + "储物袋&a(&e" + size + "格&a, &e" + styleName + "&a样式)"));
                     } else if (type.equals("pill") || type.equals("丹瓶")) {
-                        // 验证丹瓶大小
                         List<Integer> validPillSizes = Arrays.asList(9, 18, 27);
                         if (!validPillSizes.contains(size)) {
                             sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&c无效的丹瓶大小！&7可选: &f9&7, &f18&7, &f27"));
@@ -116,7 +117,7 @@ public class BagCommand implements CommandExecutor {
                     sender.sendMessage(ColorUtils.translateColorCodes("&7示例: &f/chuwudai open 12345678"));
                     return true;
                 }
-                
+
                 String bagId = args[1];
                 bagManager.openBag((Player) sender, bagId);
                 break;
@@ -129,7 +130,7 @@ public class BagCommand implements CommandExecutor {
                 Chuwudai.getInstance().reloadConfig();
                 sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&a配置文件已成功重载！"));
                 break;
-                
+
             case "help":
             case "givestone":
                 if (!sender.hasPermission("chuwudai.give")) {
@@ -162,7 +163,6 @@ public class BagCommand implements CommandExecutor {
                     player2.sendMessage(prefix + "&c你手中没有物品！");
                     return true;
                 }
-                // 测试物品匹配
                 testStoneMatch(player2, item);
                 break;
             case "deductstone":
@@ -187,20 +187,17 @@ public class BagCommand implements CommandExecutor {
                     String stoneType = args[2];
                     int amount = Integer.parseInt(args[3]);
 
-                    // 验证槽位范围
                     if (bagSlot < 0 || bagSlot > 35) {
                         player3.sendMessage(prefix + "&c槽位必须在0-35之间！");
                         return true;
                     }
 
-                    // 验证灵石类型
                     if (!isValidStoneType(stoneType)) {
                         player3.sendMessage(prefix + "&c无效的灵石类型！");
                         player3.sendMessage(prefix + "&7可用类型: 下品灵石, 中品灵石, 上品灵石, 极品灵石");
                         return true;
                     }
 
-                    // 执行扣除测试
                     testDeductStone(player3, bagSlot, stoneType, amount);
                 } catch (NumberFormatException e) {
                     player3.sendMessage(prefix + "&c槽位和数量必须是数字！");
@@ -213,9 +210,6 @@ public class BagCommand implements CommandExecutor {
         return true;
     }
 
-    /**
-     * 验证灵石类型是否有效
-     */
     private boolean isValidStoneType(String stoneType) {
         return stoneType.equals("下品灵石") ||
                 stoneType.equals("中品灵石") ||
@@ -223,9 +217,6 @@ public class BagCommand implements CommandExecutor {
                 stoneType.equals("极品灵石");
     }
 
-    /**
-     * 测试扣除灵石功能 - 调用 ChuwudaiAPI 进行测试
-     */
     private void testDeductStone(Player player, int bagSlot, String stoneType, int amount) {
         String prefix = Chuwudai.getInstance().getConfig().getString("messages.prefix", "&8[&6储物袋&8] &f");
 
@@ -234,7 +225,6 @@ public class BagCommand implements CommandExecutor {
         player.sendMessage(prefix + "&7灵石类型: &f" + stoneType);
         player.sendMessage(prefix + "&7扣除数量: &f" + amount);
 
-        // 将中文灵石类型转换为API所需的格式
         String apiStoneType = convertStoneTypeToAPIFormat(stoneType);
 
         if (apiStoneType == null) {
@@ -242,10 +232,8 @@ public class BagCommand implements CommandExecutor {
             return;
         }
 
-        // 调用 ChuwudaiAPI 的扣除方法
         ChuwudaiAPI.StoneDeductionResult result = ChuwudaiAPI.deductStoneFromSpecificBag(player, bagSlot, apiStoneType, amount);
 
-        // 显示测试结果
         player.sendMessage(prefix + "&6--- 测试结果 ---");
         player.sendMessage(prefix + "&7扣除结果: " + (result.isSuccess() ? "&a成功" : "&c失败"));
         player.sendMessage(prefix + "&7实际扣除数量: &f" + result.getDeductedAmount());
@@ -258,9 +246,6 @@ public class BagCommand implements CommandExecutor {
         }
     }
 
-    /**
-     * 将中文灵石类型转换为API格式
-     */
     private String convertStoneTypeToAPIFormat(String chineseType) {
         switch (chineseType) {
             case "下品灵石": return "&f下品灵石";
@@ -275,10 +260,10 @@ public class BagCommand implements CommandExecutor {
         return BundleStyle.isValidStyle(style);
     }
 
-    // 获取样式的中文名称
     private String getStyleChineseName(String style) {
         return BundleStyle.fromStyleName(style).getChineseName();
     }
+
     private void sendHelp(CommandSender sender) {
         String prefix = ColorUtils.translateColorCodes(Chuwudai.getInstance().getConfig().getString("messages.prefix", "&8[&6储物袋&8] &f"));
         sender.sendMessage(prefix + ColorUtils.translateColorCodes("&6=== &e储物袋插件帮助 &6==="));
@@ -286,7 +271,7 @@ public class BagCommand implements CommandExecutor {
             sender.sendMessage(ColorUtils.translateColorCodes("&e/chuwudai give <玩家> <类型> <大小> [样式] &7- 给予储物袋或丹瓶"));
             sender.sendMessage(ColorUtils.translateColorCodes("&7示例: &f/chuwudai give Steve bag 27 blue"));
             sender.sendMessage(ColorUtils.translateColorCodes("&7样式可选: &fblue&7, &fbrown&7, &fcyan&7, &fgray&7, &fgreen&7, &flight_blue&7, &flight_gray&7, &flime&7, &fmagenta&7, &forange&7, &fpink&7, &fpurple&7, &fred&7, &fwhite&7, &fyellow"));
-            sender.sendMessage(ColorUtils.translateColorCodes("&7默认样式: &fbrown"));
+            sender.sendMessage(ColorUtils.translateColorCodes("&7默认: &f不指定样式时随机选择颜色"));
             sender.sendMessage(ColorUtils.translateColorCodes("&7UI说明: 左侧←上一页 | 中间📖信息 | 右侧→下一页"));
         }
         if (sender.hasPermission("chuwudai.open")) {
@@ -313,7 +298,6 @@ public class BagCommand implements CommandExecutor {
     private void testStoneMatch(Player player, ItemStack item) {
         String prefix = Chuwudai.getInstance().getConfig().getString("messages.prefix", "&8[&6储物袋&8] &f");
 
-        // 显示物品基本信息
         player.sendMessage(prefix + "&6=== 物品匹配测试 ===");
         player.sendMessage("&7物品类型: &f" + item.getType().name());
         player.sendMessage("&7物品数量: &f" + item.getAmount());
@@ -335,7 +319,6 @@ public class BagCommand implements CommandExecutor {
             player.sendMessage("&7物品Meta: &f无");
         }
 
-        // 测试配置中的所有灵石类型
         org.bukkit.configuration.ConfigurationSection stonesSection = Chuwudai.getInstance().getConfig().getConfigurationSection("spirit-stones");
         if (stonesSection != null) {
             player.sendMessage("&6--- 配置匹配测试 ---");

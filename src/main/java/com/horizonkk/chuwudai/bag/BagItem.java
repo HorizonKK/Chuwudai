@@ -2,6 +2,7 @@ package com.horizonkk.chuwudai.bag;
 
 import com.horizonkk.chuwudai.Chuwudai;
 import com.horizonkk.chuwudai.utlis.BundleStyle;
+import com.horizonkk.chuwudai.utlis.ColorUtils;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.configuration.ConfigurationSection;
@@ -21,22 +22,21 @@ public class BagItem {
     private static final NamespacedKey BAG_SIZE_KEY = new NamespacedKey(Chuwudai.getInstance(), "bag_size");
 
     public static ItemStack createBag(int size, String id, String style) {
-        Material material = Material.PAPER; // 使用PAPER材质
-        int customModelData = getBundleCustomModelData(style); // 根据样式获取customModelData
+        Material material = Material.PAPER;
+        int customModelData = getBundleCustomModelData(style);
         ItemStack item = new ItemStack(material, 1);
         ItemMeta meta = item.getItemMeta();
-        // 设置名称
+
         String name = getStyledBagName(size, style);
-        meta.setDisplayName(name.replace("&", "§"));
-        // 创建完整的Lore
+        meta.setDisplayName(ColorUtils.translateColorCodes(name));
+
         List<String> lore = createCompleteLore(id, size, style, new HashMap<>());
         meta.setLore(lore);
-        // 设置自定义模型数据
+
         if (customModelData > 0) {
             meta.setCustomModelData(customModelData);
         }
 
-        // 添加NBT数据
         PersistentDataContainer data = meta.getPersistentDataContainer();
         data.set(BAG_ID_KEY, PersistentDataType.STRING, id);
         data.set(BAG_SIZE_KEY, PersistentDataType.INTEGER, size);
@@ -45,9 +45,10 @@ public class BagItem {
         return item;
     }
 
-    // 创建储物袋物品（不指定样式，使用默认棕色）
+    // 创建储物袋物品（不指定样式，随机颜色）
     public static ItemStack createBag(int size, String id) {
-        return createBag(size, id, "brown"); // 调用带样式参数的方法，传入默认棕色
+        String randomStyle = BundleStyle.getRandomStyleName();
+        return createBag(size, id, randomStyle);
     }
 
     // 根据样式获取CustomModelData
@@ -101,13 +102,12 @@ public class BagItem {
             lore = new ArrayList<>();
         }
 
-        // 获取储物袋ID以获取BagData
         String bagId = getBagId(bagItem);
         BagData bagData = null;
         if (bagId != null) {
             bagData = Chuwudai.getInstance().getBagManager().getBagData(bagId);
         }
-        // 重建Lore
+
         lore = rebuildLoreWithBagInfo(lore, stoneCounts, bagData);
 
         meta.setLore(lore);
@@ -118,62 +118,57 @@ public class BagItem {
     private static List<String> rebuildLoreWithBagInfo(List<String> oldLore,
                                                        Map<String, Integer> stoneCounts, BagData bagData) {
         List<String> lore = new ArrayList<>();
-        // 标记是否已经添加了基本信息、操作提示、灵石信息和容量信息
         boolean addedStorageInfo = false;
         boolean addedCapacityInfo = false;
-        // 复制旧Lore，跳过需要替换的部分
+
         for (String line : oldLore) {
-            // 跳过旧的灵石信息行
             if (line.contains("当前存储:") ||
                     line.contains("下品灵石:") ||
                     line.contains("中品灵石:") ||
                     line.contains("上品灵石:") ||
                     line.contains("极品灵石:")) {
                 if (!addedStorageInfo) {
-                    // 只保留第一次遇到的"当前存储:"行，后续的灵石行跳过
-                    lore.add("§7当前存储:");
-                    lore.add("  §f下品灵石: §7" + stoneCounts.getOrDefault("&f下品灵石", 0));
-                    lore.add("  §a中品灵石: §7" + stoneCounts.getOrDefault("&a中品灵石", 0));
-                    lore.add("  §e上品灵石: §7" + stoneCounts.getOrDefault("&e上品灵石", 0));
-                    lore.add("  §c极品灵石: §7" + stoneCounts.getOrDefault("&c极品灵石", 0));
+                    lore.add(ColorUtils.translateColorCodes("&7当前存储:"));
+                    lore.add(ColorUtils.translateColorCodes("  &f下品灵石: &7" + stoneCounts.getOrDefault("&f下品灵石", 0)));
+                    lore.add(ColorUtils.translateColorCodes("  &a中品灵石: &7" + stoneCounts.getOrDefault("&a中品灵石", 0)));
+                    lore.add(ColorUtils.translateColorCodes("  &e上品灵石: &7" + stoneCounts.getOrDefault("&e上品灵石", 0)));
+                    lore.add(ColorUtils.translateColorCodes("  &c极品灵石: &7" + stoneCounts.getOrDefault("&c极品灵石", 0)));
                     addedStorageInfo = true;
                 }
-                continue; // 跳过这些行
+                continue;
             }
-            // 跳过旧的容量信息行
+
             if (line.contains("储物大小:") || line.contains("当前容量:")) {
                 if (!addedCapacityInfo && bagData != null) {
-                    // 添加新的容量信息
-                    lore.add("§f储物大小: §7" + bagData.getUsedSlots() + "/" + bagData.getSize() + " 槽位");
-                    lore.add("§f当前容量: " + formatProgressBar(bagData));
+                    lore.add(ColorUtils.translateColorCodes("&f储物大小: &7" + bagData.getUsedSlots() + "/" + bagData.getSize() + " 槽位"));
+                    lore.add(ColorUtils.translateColorCodes("&f当前容量: ") + formatProgressBar(bagData));
                     addedCapacityInfo = true;
                 } else if (!addedCapacityInfo) {
-                    // 如果没有BagData，添加默认信息
-                    lore.add("§f储物大小: §70/0 槽位");
-                    lore.add("§f当前容量: §70% §8||||||||||||||||||||");
+                    lore.add(ColorUtils.translateColorCodes("&f储物大小: &70/0 槽位"));
+                    lore.add(ColorUtils.translateColorCodes("&f当前容量: &70% &8||||||||||||||||||||"));
                     addedCapacityInfo = true;
                 }
-                continue; // 跳过这些行
+                continue;
             }
-            // 保留其他行
+
             lore.add(line);
         }
-        // 如果还没有添加灵石信息，添加它
+
         if (!addedStorageInfo) {
-            lore.add("§7当前存储:");
-            lore.add("  §f下品灵石: §7" + stoneCounts.getOrDefault("&f下品灵石", 0));
-            lore.add("  §a中品灵石: §7" + stoneCounts.getOrDefault("&a中品灵石", 0));
-            lore.add("  §e上品灵石: §7" + stoneCounts.getOrDefault("&e上品灵石", 0));
-            lore.add("  §c极品灵石: §7" + stoneCounts.getOrDefault("&c极品灵石", 0));
+            lore.add(ColorUtils.translateColorCodes("&7当前存储:"));
+            lore.add(ColorUtils.translateColorCodes("  &f下品灵石: &7" + stoneCounts.getOrDefault("&f下品灵石", 0)));
+            lore.add(ColorUtils.translateColorCodes("  &a中品灵石: &7" + stoneCounts.getOrDefault("&a中品灵石", 0)));
+            lore.add(ColorUtils.translateColorCodes("  &e上品灵石: &7" + stoneCounts.getOrDefault("&e上品灵石", 0)));
+            lore.add(ColorUtils.translateColorCodes("  &c极品灵石: &7" + stoneCounts.getOrDefault("&c极品灵石", 0)));
         }
-        // 如果还没有添加容量信息，添加它
+
         if (!addedCapacityInfo) {
             if (bagData != null) {
-                lore.add("§f储物大小: §7" + bagData.getUsedSlots() + "/" + bagData.getSize() + " 槽位");
-                lore.add("§f当前容量: " + formatProgressBar(bagData));
+                lore.add(ColorUtils.translateColorCodes("&f储物大小: &7" + bagData.getUsedSlots() + "/" + bagData.getSize() + " 槽位"));
+                lore.add(ColorUtils.translateColorCodes("&f当前容量: ") + formatProgressBar(bagData));
             } else {
-                lore.add("§f储物大小: §70/0 槽位");
-                lore.add("§f当前容量: §70% §8||||||||||||||||||||");
+                lore.add(ColorUtils.translateColorCodes("&f储物大小: &70/0 槽位"));
+                lore.add(ColorUtils.translateColorCodes("&f当前容量: &70% &8||||||||||||||||||||"));
             }
         }
         return lore;
@@ -185,21 +180,21 @@ public class BagItem {
         int total = bagData.getSize();
         int percentage = bagData.getCapacityPercentage();
         StringBuilder progressBar = new StringBuilder();
-        // 添加百分比文字
-        progressBar.append("§7").append(percentage).append("% ");
-        // 从配置获取进度条设置
+
+        progressBar.append(ColorUtils.translateColorCodes("&7")).append(percentage).append("% ");
+
         int barLength = Chuwudai.getInstance().getConfig().getInt("progress-bar.length", 20);
         String filledColor = Chuwudai.getInstance().getConfig().getString("progress-bar.filled-color", "&a");
         String emptyColor = Chuwudai.getInstance().getConfig().getString("progress-bar.empty-color", "&8");
-        boolean showPercentage = Chuwudai.getInstance().getConfig().getBoolean("progress-bar.show-percentage", true);
-        // 生成进度条
+
         int filledBars = (percentage * barLength) / 100;
         int emptyBars = barLength - filledBars;
-        progressBar.append(filledColor.replace("&", "§"));
+
+        progressBar.append(ColorUtils.translateColorCodes(filledColor));
         for (int i = 0; i < filledBars; i++) {
             progressBar.append("|");
         }
-        progressBar.append(emptyColor.replace("&", "§"));
+        progressBar.append(ColorUtils.translateColorCodes(emptyColor));
         for (int i = 0; i < emptyBars; i++) {
             progressBar.append("|");
         }
@@ -211,27 +206,23 @@ public class BagItem {
     private static List<String> createCompleteLore(String bagId, int size, String style, Map<String, Integer> stoneCounts) {
         List<String> lore = new ArrayList<>();
 
-        // 添加样式信息作为第一行
         String styleDisplayName = getStyleDisplayName(style);
         String styleColor = getStyleColorCode(style);
-        lore.add("§7样式: " + styleColor + styleDisplayName);
-        lore.add("§8ID: " + bagId);
+        lore.add(ColorUtils.translateColorCodes("&7样式: " + styleColor + styleDisplayName));
+        lore.add(ColorUtils.translateColorCodes("&8ID: " + bagId));
 
-        // 添加操作提示
-        lore.add("§8可通过置于背包的储物袋槽位中右键点击打开储物袋");
+        lore.add(ColorUtils.translateColorCodes("&8可通过置于背包的储物袋槽位中右键点击打开储物袋"));
         lore.add("");
 
-        // 添加灵石存储信息
-        lore.add("§7当前存储:");
-        lore.add("  §f下品灵石: §70");
-        lore.add("  §a中品灵石: §70");
-        lore.add("  §e上品灵石: §70");
-        lore.add("  §c极品灵石: §70");
+        lore.add(ColorUtils.translateColorCodes("&7当前存储:"));
+        lore.add(ColorUtils.translateColorCodes("  &f下品灵石: &70"));
+        lore.add(ColorUtils.translateColorCodes("  &a中品灵石: &70"));
+        lore.add(ColorUtils.translateColorCodes("  &e上品灵石: &70"));
+        lore.add(ColorUtils.translateColorCodes("  &c极品灵石: &70"));
 
-        // 添加容量信息
         lore.add("");
-        lore.add("§f储物大小: §70/" + size + " 槽位");
-        lore.add("§f当前容量: §70% §8||||||||||||||||||||");
+        lore.add(ColorUtils.translateColorCodes("&f储物大小: &70/" + size + " 槽位"));
+        lore.add(ColorUtils.translateColorCodes("&f当前容量: &70% &8||||||||||||||||||||"));
 
         return lore;
     }

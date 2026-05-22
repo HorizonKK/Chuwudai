@@ -26,9 +26,10 @@ public class BagManager {
         return id;
     }
 
-    // 创建储物袋物品（无样式参数，使用默认棕色）
+    // 创建储物袋物品（无样式参数，随机颜色）
     public ItemStack createBagItem(int size) {
-        return BagItem.createBag(size, generateBagId(), "brown"); // 默认棕色样式
+        String randomStyle = BundleStyle.getRandomStyleName();
+        return BagItem.createBag(size, generateBagId(), randomStyle);
     }
 
     // 创建储物袋物品（指定样式）
@@ -36,16 +37,22 @@ public class BagManager {
         return BagItem.createBag(size, generateBagId(), style);
     }
 
+    // 给予玩家储物袋（随机样式）
+    public void giveBagToPlayer(Player player, int size) {
+        String randomStyle = BundleStyle.getRandomStyleName();
+        giveBagToPlayer(player, size, randomStyle);
+    }
+
     // 给予玩家储物袋（指定样式）
     public void giveBagToPlayer(Player player, int size, String style) {
         ItemStack bag = createBagItem(size, style);
-        String bagId = BagItem.getBagId(bag); // 获取新生成的ID
-        // 创建空的储物袋数据并保存
+        String bagId = BagItem.getBagId(bag);
+
         BagData emptyBagData = new BagData(bagId, size);
         Chuwudai.getInstance().getDataManager().saveBag(emptyBagData);
+
         Map<Integer, ItemStack> leftover = player.getInventory().addItem(bag);
         if (!leftover.isEmpty()) {
-            // 背包已满，掉落在地上
             player.getWorld().dropItem(player.getLocation(), bag);
         }
 
@@ -56,11 +63,6 @@ public class BagManager {
                         .replace("%type%", bagType)
                         .replace("%id%", bagId)
                         .replace("%style%", styleName)));
-    }
-
-    // 给予玩家储物袋（不指定样式，使用默认棕色）
-    public void giveBagToPlayer(Player player, int size) {
-        giveBagToPlayer(player, size, "brown"); // 调用带样式参数的方法，传入默认棕色
     }
 
     private String getStyleChineseName(String style) {
@@ -83,22 +85,17 @@ public class BagManager {
     public void openBag(Player player, String bagId) {
         BagData bagData = getBagData(bagId);
         if (bagData == null) {
-            // 检查是否是有效的储物袋ID（存在对应的物品）
-            // 如果是新创建的储物袋，初始化数据
-            int defaultSize = 27; // 可以通过其他方式获取实际大小
+            int defaultSize = 27;
             bagData = new BagData(bagId, defaultSize);
-            // 保存新创建的空数据
             Chuwudai.getInstance().getDataManager().saveBag(bagData);
             bagCache.put(bagId, bagData);
         }
         try {
             BagInventory inventory = new BagInventory(bagData);
             inventory.open(player);
-            // 发送成功消息
             player.sendMessage(ColorUtils.translateColorCodes(Chuwudai.getInstance().getConfig().getString("messages.prefix", "&8[&6储物袋&8] &f") +
                     Chuwudai.getInstance().getConfig().getString("messages.bag-opened", "&a已打开储物袋 %id%")
                             .replace("%id%", bagId)));
-            // 注意：打开时不需要更新Lore，因为库存事件会处理
         } catch (Exception e) {
             player.sendMessage(ColorUtils.translateColorCodes(Chuwudai.getInstance().getConfig().getString("messages.prefix", "&8[&6储物袋&8] &f") +
                     "&c打开储物袋时发生错误，请联系管理员"));
