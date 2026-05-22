@@ -184,43 +184,49 @@ public class ChuwudaiAPI {
 
         PlayerInventory inventory = player.getInventory();
         ItemStack bagItem = inventory.getItem(bagSlot);
+        if (bagItem == null || !BagItem.isBagItem(bagItem)) return 0;
+
+        String bagId = BagItem.getBagId(bagItem);
+        BagData bagData = bagManager.getBagData(bagId);
+        if (bagData == null) return 0;
+
+        return deductStoneFromBagSlot(player, bagSlot, stoneType, amount, bagData);
+    }
+
+    /**
+     * 从指定槽位的储物袋中扣除灵石（传入已获取的BagData，避免重复查询）
+     */
+    private static int deductStoneFromBagSlot(Player player, int bagSlot, String stoneType, int amount, BagData bagData) {
+        PlayerInventory inventory = player.getInventory();
+        ItemStack bagItem = inventory.getItem(bagSlot);
 
         if (bagItem == null || !BagItem.isBagItem(bagItem)) {
             return 0;
         }
 
         String bagId = BagItem.getBagId(bagItem);
-        BagData bagData = bagManager.getBagData(bagId);
-
-        if (bagData == null) {
-            return 0;
-        }
-
         int deducted = 0;
-        // 按顺序遍历储物袋槽位，扣除灵石（参照丹瓶扣除丹药的方式）
+
         for (int slot = 0; slot < bagData.getSize() && deducted < amount; slot++) {
             ItemStack item = bagData.getItem(slot);
             if (item != null && isMatchingStone(item, stoneType)) {
                 int toDeduct = Math.min(item.getAmount(), amount - deducted);
                 if (toDeduct > 0) {
                     if (item.getAmount() > toDeduct) {
-                        // 减少数量
                         item.setAmount(item.getAmount() - toDeduct);
-                        bagData.setItem(slot, item);
+                        bagData.setItemSilent(slot, item);
                     } else {
-                        // 完全移除
-                        bagData.removeItem(slot);
+                        bagData.removeItemSilent(slot);
                     }
                     deducted += toDeduct;
                 }
             }
         }
 
-        // 保存储物袋数据
         if (deducted > 0) {
+            bagData.decrementStoneCount(stoneType, deducted);
             bagManager.saveBagData(bagId);
-            // 更新储物袋物品的Lore
-            BagItem.updateBagLore(bagItem, bagData.getStoneCounts());
+            BagItem.updateBagLore(bagItem, bagData.getStoneCounts(), bagData);
             inventory.setItem(bagSlot, bagItem);
         }
 
@@ -265,8 +271,8 @@ public class ChuwudaiAPI {
             return new StoneDeductionResult(0, "储物袋中" + getStoneDisplayName(stoneType) + "不足，需要" + amount + "个，只有" + available + "个");
         }
 
-        // 执行扣除
-        int deducted = deductStoneFromBagSlot(player, bagSlot, stoneType, amount);
+        // 执行扣除，传入已获取的bagData避免重复查询
+        int deducted = deductStoneFromBagSlot(player, bagSlot, stoneType, amount, bagData);
 
         if (deducted == amount) {
             return new StoneDeductionResult(deducted, "成功从储物袋扣除" + deducted + "个" + getStoneDisplayName(stoneType));
@@ -302,7 +308,7 @@ public class ChuwudaiAPI {
 
                     if (available > 0) {
                         int toDeduct = Math.min(available, amount - totalDeducted);
-                        int actuallyDeducted = deductStoneFromBagSlot(player, slot, stoneType, toDeduct);
+                        int actuallyDeducted = deductStoneFromBagSlot(player, slot, stoneType, toDeduct, bagData);
                         totalDeducted += actuallyDeducted;
 
                         if (totalDeducted >= amount) {
@@ -320,6 +326,174 @@ public class ChuwudaiAPI {
         } else {
             return new StoneDeductionResult(0, "所有储物袋中都没有足够的" + getStoneDisplayName(stoneType));
         }
+    }
+
+    // ==================== 批量灵石扣除API ====================
+
+    /**
+     * 从玩家背包指定储物袋批量扣除多种灵石
+     * 只扫描一次储物袋，保存一次，更新一次Lore
+     * @param player 玩家
+     * @param bagSlot 储物袋槽位（0-35）
+     * @param requiredStones 需要扣除的灵石 Map<灵石类型(&f下品灵石), 数量>
+     * @return 批量扣除结果
+     */
+    public static BatchStoneDeductionResult deductStonesFromSpecificBag(Player player, int bagSlot, Map<String, Integer> requiredStones) {
+        if (requiredStones == null || requiredStones.isEmpty()) {
+            return new BatchStoneDeductionResult(new HashMap<>(), new HashMap<>());
+        }
+
+        PlayerInventory inventory = player.getInventory();
+        ItemStack bagItem = inventory.getItem(bagSlot);
+
+        if (bagItem == null) {
+            return new BatchStoneDeductionResult(new HashMap<>(), new HashMap<>(requiredStones));
+        }
+        if (!BagItem.isBagItem(bagItem)) {
+            return new BatchStoneDeductionResult(new HashMap<>(), new HashMap<>(requiredStones));
+        }
+
+        String bagId = BagItem.getBagId(bagItem);
+        BagData bagData = bagManager.getBagData(bagId);
+
+        if (bagData == null) {
+            return new BatchStoneDeductionResult(new HashMap<>(), new HashMap<>(requiredStones));
+        }
+
+        // 预检可用量
+        Map<String, Integer> available = bagData.getStoneCounts();
+        Map<String, Integer> needed = new HashMap<>();
+        for (Map.Entry<String, Integer> entry : requiredStones.entrySet()) {
+            int avail = available.getOrDefault(entry.getKey(), 0);
+            needed.put(entry.getKey(), Math.min(entry.getValue(), avail));
+        }
+
+        // 单次扫描扣除
+        Map<String, Integer> deducted = deductStonesFromBag(player, bagSlot, needed, bagData);
+
+        return new BatchStoneDeductionResult(deducted,
+                computeRemaining(requiredStones, deducted));
+    }
+
+    /**
+     * 从玩家背包任意储物袋批量扣除多种灵石（自动查找）
+     * @param player 玩家
+     * @param requiredStones 需要扣除的灵石 Map<灵石类型, 数量>
+     * @return 批量扣除结果
+     */
+    public static BatchStoneDeductionResult deductStonesFromAnyBag(Player player, Map<String, Integer> requiredStones) {
+        if (requiredStones == null || requiredStones.isEmpty()) {
+            return new BatchStoneDeductionResult(new HashMap<>(), new HashMap<>());
+        }
+
+        PlayerInventory inventory = player.getInventory();
+        Map<String, Integer> remaining = new HashMap<>(requiredStones);
+        Map<String, Integer> totalDeducted = new HashMap<>();
+
+        for (int slot = 0; slot < 36; slot++) {
+            ItemStack item = inventory.getItem(slot);
+            if (item == null || !BagItem.isBagItem(item)) continue;
+
+            String bagId = BagItem.getBagId(item);
+            BagData bagData = bagManager.getBagData(bagId);
+            if (bagData == null) continue;
+
+            // 计算当前储物袋能贡献多少
+            Map<String, Integer> available = bagData.getStoneCounts();
+            Map<String, Integer> neededFromBag = new HashMap<>();
+            for (Map.Entry<String, Integer> entry : remaining.entrySet()) {
+                if (entry.getValue() > 0) {
+                    int avail = available.getOrDefault(entry.getKey(), 0);
+                    if (avail > 0) {
+                        neededFromBag.put(entry.getKey(), Math.min(avail, entry.getValue()));
+                    }
+                }
+            }
+
+            if (neededFromBag.isEmpty()) continue;
+
+            Map<String, Integer> deducted = deductStonesFromBag(player, slot, neededFromBag, bagData);
+            for (Map.Entry<String, Integer> entry : deducted.entrySet()) {
+                remaining.merge(entry.getKey(), -entry.getValue(), Integer::sum);
+                totalDeducted.merge(entry.getKey(), entry.getValue(), Integer::sum);
+            }
+
+            remaining.values().removeIf(v -> v <= 0);
+            if (remaining.isEmpty()) break;
+        }
+
+        remaining.values().removeIf(v -> v <= 0);
+        return new BatchStoneDeductionResult(totalDeducted, remaining);
+    }
+
+    /**
+     * 核心扣除逻辑：单次扫描储物袋扣除多种灵石
+     * @return 实际扣除量 Map<灵石类型, 扣除数量>
+     */
+    private static Map<String, Integer> deductStonesFromBag(Player player, int bagSlot, Map<String, Integer> needed, BagData bagData) {
+        Map<String, Integer> remaining = new HashMap<>(needed);
+        Map<String, Integer> deducted = new HashMap<>();
+
+        PlayerInventory inventory = player.getInventory();
+        ItemStack bagItem = inventory.getItem(bagSlot);
+        if (bagItem == null || !BagItem.isBagItem(bagItem)) return deducted;
+
+        String bagId = BagItem.getBagId(bagItem);
+
+        for (int slot = 0; slot < bagData.getSize(); slot++) {
+            ItemStack item = bagData.getItem(slot);
+            if (item == null) continue;
+
+            for (String stoneType : new java.util.ArrayList<>(remaining.keySet())) {
+                int need = remaining.get(stoneType);
+                if (need <= 0) {
+                    remaining.remove(stoneType);
+                    continue;
+                }
+                if (isMatchingStone(item, stoneType)) {
+                    int toDeduct = Math.min(item.getAmount(), need);
+                    if (item.getAmount() > toDeduct) {
+                        item.setAmount(item.getAmount() - toDeduct);
+                        bagData.setItemSilent(slot, item);
+                    } else {
+                        bagData.removeItemSilent(slot);
+                    }
+                    remaining.put(stoneType, need - toDeduct);
+                    deducted.merge(stoneType, toDeduct, Integer::sum);
+                    break;
+                }
+            }
+
+            if (remaining.isEmpty() || remaining.values().stream().allMatch(v -> v <= 0)) {
+                break;
+            }
+        }
+
+        remaining.values().removeIf(v -> v <= 0);
+
+        int totalDeducted = deducted.values().stream().mapToInt(Integer::intValue).sum();
+        if (totalDeducted > 0) {
+            for (Map.Entry<String, Integer> entry : deducted.entrySet()) {
+                bagData.decrementStoneCount(entry.getKey(), entry.getValue());
+            }
+            bagManager.saveBagData(bagId);
+            BagItem.updateBagLore(bagItem, bagData.getStoneCounts(), bagData);
+            inventory.setItem(bagSlot, bagItem);
+        }
+
+        return deducted;
+    }
+
+    private static Map<String, Integer> computeRemaining(Map<String, Integer> required, Map<String, Integer> deducted) {
+        Map<String, Integer> remaining = new HashMap<>();
+        for (Map.Entry<String, Integer> entry : required.entrySet()) {
+            int d = deducted.getOrDefault(entry.getKey(), 0);
+            int r = entry.getValue() - d;
+            if (r > 0) {
+                remaining.put(entry.getKey(), r);
+            }
+        }
+        return remaining;
     }
 
     // ==================== 工具方法API ====================
@@ -496,6 +670,60 @@ public class ChuwudaiAPI {
                     "deductedAmount=" + deductedAmount +
                     ", message='" + message + '\'' +
                     ", success=" + success +
+                    '}';
+        }
+    }
+
+    /**
+     * 批量灵石扣除结果类
+     */
+    public static class BatchStoneDeductionResult {
+        private final Map<String, Integer> deductedAmounts;
+        private final Map<String, Integer> remainingAmounts;
+        private final boolean allSuccess;
+        private final String message;
+
+        public BatchStoneDeductionResult(Map<String, Integer> deductedAmounts, Map<String, Integer> remainingAmounts) {
+            this.deductedAmounts = new HashMap<>(deductedAmounts);
+            this.remainingAmounts = new HashMap<>(remainingAmounts);
+            this.allSuccess = remainingAmounts.isEmpty();
+
+            StringBuilder sb = new StringBuilder();
+            if (allSuccess) {
+                sb.append("成功扣除: ");
+            } else {
+                sb.append("部分扣除: ");
+            }
+            boolean first = true;
+            for (Map.Entry<String, Integer> entry : deductedAmounts.entrySet()) {
+                if (!first) sb.append(", ");
+                sb.append(getStoneDisplayName(entry.getKey())).append("x").append(entry.getValue());
+                first = false;
+            }
+            if (!allSuccess) {
+                sb.append(" | 不足: ");
+                first = true;
+                for (Map.Entry<String, Integer> entry : remainingAmounts.entrySet()) {
+                    if (!first) sb.append(", ");
+                    sb.append(getStoneDisplayName(entry.getKey())).append("差").append(entry.getValue());
+                    first = false;
+                }
+            }
+            this.message = sb.toString();
+        }
+
+        public Map<String, Integer> getDeductedAmounts() { return new HashMap<>(deductedAmounts); }
+        public Map<String, Integer> getRemainingAmounts() { return new HashMap<>(remainingAmounts); }
+        public boolean isAllSuccess() { return allSuccess; }
+        public String getMessage() { return message; }
+
+        @Override
+        public String toString() {
+            return "BatchStoneDeductionResult{" +
+                    "deductedAmounts=" + deductedAmounts +
+                    ", remainingAmounts=" + remainingAmounts +
+                    ", allSuccess=" + allSuccess +
+                    ", message='" + message + '\'' +
                     '}';
         }
     }

@@ -14,7 +14,9 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class BagCommand implements CommandExecutor {
 
@@ -131,6 +133,52 @@ public class BagCommand implements CommandExecutor {
                 sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&a配置文件已成功重载！"));
                 break;
 
+            case "batchdeduct":
+                if (!sender.hasPermission("chuwudai.test")) {
+                    sender.sendMessage(ColorUtils.translateColorCodes(prefix + Chuwudai.getInstance().getConfig().getString("messages.no-permission", "&c你没有权限！")));
+                    return true;
+                }
+                if (!(sender instanceof Player)) {
+                    sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&c只有玩家才能使用此命令！"));
+                    return true;
+                }
+                if (args.length < 3) {
+                    sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&c用法: &e/chuwudai batchdeduct <槽位> <下品数量> <中品数量> <上品数量> <极品数量>"));
+                    sender.sendMessage(ColorUtils.translateColorCodes("&7示例: &f/chuwudai batchdeduct 9 100 50 0 0"));
+                    return true;
+                }
+                try {
+                    int bagSlot = Integer.parseInt(args[1]);
+                    if (bagSlot < 0 || bagSlot > 35) {
+                        sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&c槽位必须在0-35之间！"));
+                        return true;
+                    }
+                    Map<String, Integer> stones = new HashMap<>();
+                    if (args.length >= 3) {
+                        int xp = Integer.parseInt(args[2]);
+                        if (xp > 0) stones.put("&f下品灵石", xp);
+                    }
+                    if (args.length >= 4) {
+                        int zp = Integer.parseInt(args[3]);
+                        if (zp > 0) stones.put("&a中品灵石", zp);
+                    }
+                    if (args.length >= 5) {
+                        int sp = Integer.parseInt(args[4]);
+                        if (sp > 0) stones.put("&e上品灵石", sp);
+                    }
+                    if (args.length >= 6) {
+                        int jp = Integer.parseInt(args[5]);
+                        if (jp > 0) stones.put("&c极品灵石", jp);
+                    }
+                    if (stones.isEmpty()) {
+                        sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&c至少需要指定一种灵石数量！"));
+                        return true;
+                    }
+                    testBatchDeduct((Player) sender, bagSlot, stones);
+                } catch (NumberFormatException e) {
+                    sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&c槽位和数量必须是数字！"));
+                }
+                break;
             case "help":
             case "givestone":
                 if (!sender.hasPermission("chuwudai.give")) {
@@ -218,31 +266,81 @@ public class BagCommand implements CommandExecutor {
     }
 
     private void testDeductStone(Player player, int bagSlot, String stoneType, int amount) {
-        String prefix = Chuwudai.getInstance().getConfig().getString("messages.prefix", "&8[&6储物袋&8] &f");
+        String prefix = ColorUtils.translateColorCodes(
+                Chuwudai.getInstance().getConfig().getString("messages.prefix", "&8[&6储物袋&8] &f"));
 
-        player.sendMessage(prefix + "&6=== 灵石扣除测试 ===");
-        player.sendMessage(prefix + "&7槽位: &f" + bagSlot);
-        player.sendMessage(prefix + "&7灵石类型: &f" + stoneType);
-        player.sendMessage(prefix + "&7扣除数量: &f" + amount);
+        player.sendMessage(ColorUtils.translateColorCodes(prefix + "&6=== 灵石扣除测试 ==="));
+        player.sendMessage(ColorUtils.translateColorCodes(prefix + "&7槽位: &f" + bagSlot));
+        player.sendMessage(ColorUtils.translateColorCodes(prefix + "&7灵石类型: &f" + stoneType));
+        player.sendMessage(ColorUtils.translateColorCodes(prefix + "&7扣除数量: &f" + amount));
 
         String apiStoneType = convertStoneTypeToAPIFormat(stoneType);
 
         if (apiStoneType == null) {
-            player.sendMessage(prefix + "&c无效的灵石类型！");
+            player.sendMessage(ColorUtils.translateColorCodes(prefix + "&c无效的灵石类型！"));
             return;
         }
 
+        long start = System.nanoTime();
         ChuwudaiAPI.StoneDeductionResult result = ChuwudaiAPI.deductStoneFromSpecificBag(player, bagSlot, apiStoneType, amount);
+        long elapsed = System.nanoTime() - start;
 
-        player.sendMessage(prefix + "&6--- 测试结果 ---");
-        player.sendMessage(prefix + "&7扣除结果: " + (result.isSuccess() ? "&a成功" : "&c失败"));
-        player.sendMessage(prefix + "&7实际扣除数量: &f" + result.getDeductedAmount());
-        player.sendMessage(prefix + "&7消息: &f" + result.getMessage());
+        player.sendMessage(ColorUtils.translateColorCodes(prefix + "&6--- 测试结果 ---"));
+        player.sendMessage(ColorUtils.translateColorCodes(prefix + "&7扣除结果: " + (result.isSuccess() ? "&a成功" : "&c失败")));
+        player.sendMessage(ColorUtils.translateColorCodes(prefix + "&7实际扣除数量: &f" + result.getDeductedAmount()));
+        player.sendMessage(ColorUtils.translateColorCodes(prefix + "&7消息: &f" + result.getMessage()));
+        player.sendMessage(ColorUtils.translateColorCodes(prefix + "&7耗时: &e" + String.format("%.3f", elapsed / 1_000_000.0) + " ms &7(&e" + elapsed + " ns&7)"));
 
         if (result.isSuccess()) {
-            player.sendMessage(prefix + "&a✓ 灵石扣除测试通过！");
+            player.sendMessage(ColorUtils.translateColorCodes(prefix + "&a✓ 灵石扣除测试通过！"));
         } else {
-            player.sendMessage(prefix + "&c✗ 灵石扣除测试失败！");
+            player.sendMessage(ColorUtils.translateColorCodes(prefix + "&c✗ 灵石扣除测试失败！"));
+        }
+    }
+
+    private void testBatchDeduct(Player player, int bagSlot, Map<String, Integer> stones) {
+        String prefix = ColorUtils.translateColorCodes(
+                Chuwudai.getInstance().getConfig().getString("messages.prefix", "&8[&6储物袋&8] &f"));
+
+        player.sendMessage(ColorUtils.translateColorCodes(prefix + "&6=== 批量灵石扣除测试 ==="));
+        player.sendMessage(ColorUtils.translateColorCodes(prefix + "&7槽位: &f" + bagSlot));
+        StringBuilder typesStr = new StringBuilder();
+        for (Map.Entry<String, Integer> entry : stones.entrySet()) {
+            if (typesStr.length() > 0) typesStr.append("&7, ");
+            typesStr.append("&e").append(getChineseName(entry.getKey())).append("&7x&f").append(entry.getValue());
+        }
+        player.sendMessage(ColorUtils.translateColorCodes(prefix + "&7扣除: " + typesStr));
+
+        long start = System.nanoTime();
+        ChuwudaiAPI.BatchStoneDeductionResult result = ChuwudaiAPI.deductStonesFromSpecificBag(player, bagSlot, stones);
+        long elapsed = System.nanoTime() - start;
+
+        player.sendMessage(ColorUtils.translateColorCodes(prefix + "&6--- 批量扣除结果 ---"));
+        player.sendMessage(ColorUtils.translateColorCodes(prefix + "&7结果: " + (result.isAllSuccess() ? "&a全部成功" : "&e部分成功")));
+        StringBuilder deductedStr = new StringBuilder();
+        for (Map.Entry<String, Integer> entry : result.getDeductedAmounts().entrySet()) {
+            if (deductedStr.length() > 0) deductedStr.append("&7, ");
+            deductedStr.append("&e").append(getChineseName(entry.getKey())).append("&7x&f").append(entry.getValue());
+        }
+        player.sendMessage(ColorUtils.translateColorCodes(prefix + "&7已扣除: " + deductedStr));
+        if (!result.isAllSuccess()) {
+            StringBuilder remainingStr = new StringBuilder();
+            for (Map.Entry<String, Integer> entry : result.getRemainingAmounts().entrySet()) {
+                if (remainingStr.length() > 0) remainingStr.append("&7, ");
+                remainingStr.append("&e").append(getChineseName(entry.getKey())).append("&7差&f").append(entry.getValue());
+            }
+            player.sendMessage(ColorUtils.translateColorCodes(prefix + "&7不足: " + remainingStr));
+        }
+        player.sendMessage(ColorUtils.translateColorCodes(prefix + "&7耗时: &e" + String.format("%.3f", elapsed / 1_000_000.0) + " ms &7(&e" + elapsed + " ns&7)"));
+    }
+
+    private String getChineseName(String apiStoneType) {
+        switch (apiStoneType) {
+            case "&f下品灵石": return "下品灵石";
+            case "&a中品灵石": return "中品灵石";
+            case "&e上品灵石": return "上品灵石";
+            case "&c极品灵石": return "极品灵石";
+            default: return apiStoneType;
         }
     }
 

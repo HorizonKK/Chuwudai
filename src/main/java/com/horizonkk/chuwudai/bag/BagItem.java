@@ -94,18 +94,22 @@ public class BagItem {
     // 更新储物袋Lore显示灵石数量和容量信息
     public static void updateBagLore(ItemStack bagItem, Map<String, Integer> stoneCounts) {
         if (!isBagItem(bagItem)) return;
+        String bagId = getBagId(bagItem);
+        BagData bagData = bagId != null ? Chuwudai.getInstance().getBagManager().getBagData(bagId) : null;
+        updateBagLore(bagItem, stoneCounts, bagData);
+    }
+
+    /**
+     * 更新储物袋Lore（传入已获取的BagData，避免重复查询）
+     */
+    public static void updateBagLore(ItemStack bagItem, Map<String, Integer> stoneCounts, BagData bagData) {
+        if (!isBagItem(bagItem)) return;
 
         ItemMeta meta = bagItem.getItemMeta();
         List<String> lore = meta.getLore();
 
         if (lore == null) {
             lore = new ArrayList<>();
-        }
-
-        String bagId = getBagId(bagItem);
-        BagData bagData = null;
-        if (bagId != null) {
-            bagData = Chuwudai.getInstance().getBagManager().getBagData(bagId);
         }
 
         lore = rebuildLoreWithBagInfo(lore, stoneCounts, bagData);

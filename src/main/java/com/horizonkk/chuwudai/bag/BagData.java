@@ -39,15 +39,36 @@ public class BagData {
         items.put(slot, item);
         updateStoneCounts();
     }
-    
+
+    /**
+     * 设置物品但不触发灵石计数更新（批量操作时使用，完后手动调 updateStoneCounts）
+     */
+    public void setItemSilent(int slot, ItemStack item) {
+        items.put(slot, item);
+    }
+
     // 移除物品
     public void removeItem(int slot) {
         items.remove(slot);
         updateStoneCounts();
     }
-    
+
+    /**
+     * 移除物品但不触发灵石计数更新（批量操作时使用，完后手动调 updateStoneCounts）
+     */
+    public void removeItemSilent(int slot) {
+        items.remove(slot);
+    }
+
+    /**
+     * 扣除指定类型的灵石计数（批量扣除时直接维护，O(1) 避免全量扫描）
+     */
+    public void decrementStoneCount(String stoneType, int amount) {
+        stoneCounts.merge(stoneType, -amount, Integer::sum);
+    }
+
     // 更新灵石计数
-    private void updateStoneCounts() {
+    public void updateStoneCounts() {
         // 重置计数
         for (String key : stoneCounts.keySet()) {
             stoneCounts.put(key, 0);
