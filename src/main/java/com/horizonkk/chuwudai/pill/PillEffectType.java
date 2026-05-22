@@ -23,7 +23,7 @@ public enum PillEffectType {
     HU_ZHAO("dan_yao_huzhao", "护罩", new ShieldHandler()),
 
     // ===== 毒性类 =====
-    DAN_DU("dan_yao_dandu", "丹毒", new PoisonHandler()),
+    DAN_DU("dan_yao_dandu", "丹毒", new DanduHandler()),
     JIAN_DAN_DU("dan_yao_jiandandu", "减丹毒", new ReducePoisonHandler()),
 
     // ===== 临时增益类 =====
