@@ -141,13 +141,7 @@ public class BagData {
 
     // 获取已使用的槽位数量
     public int getUsedSlots() {
-        int count = 0;
-        for (int i = 0; i < size; i++) {
-            if (items.get(i) != null) {
-                count++;
-            }
-        }
-        return count;
+        return items.size();
     }
 
     // 获取剩余槽位数量

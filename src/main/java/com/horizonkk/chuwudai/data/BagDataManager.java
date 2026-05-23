@@ -140,9 +140,10 @@ public class BagDataManager {
                 int slot = Integer.parseInt(key);
                 ItemStack item = itemsSection.getItemStack(key);
                 if (item != null) {
-                    bagData.setItem(slot, item);
+                    bagData.setItemSilent(slot, item);
                 }
             }
+            bagData.updateStoneCounts();
         }
 
         return bagData;
@@ -186,12 +187,9 @@ public class BagDataManager {
         yml.set("id", bagData.getId());
         yml.set("size", bagData.getSize());
 
-        // 保存物品
-        for (int i = 0; i < bagData.getSize(); i++) {
-            ItemStack item = bagData.getItem(i);
-            if (item != null) {
-                yml.set("items." + i, item);
-            }
+        // 保存物品（只遍历非空槽位）
+        for (Map.Entry<Integer, ItemStack> entry : bagData.getAllItems().entrySet()) {
+            yml.set("items." + entry.getKey(), entry.getValue());
         }
 
         try {

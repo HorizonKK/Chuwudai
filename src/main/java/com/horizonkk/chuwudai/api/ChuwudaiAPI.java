@@ -208,9 +208,11 @@ public class ChuwudaiAPI {
         String bagId = BagItem.getBagId(bagItem);
         int deducted = 0;
 
-        for (int slot = 0; slot < bagData.getSize() && deducted < amount; slot++) {
-            ItemStack item = bagData.getItem(slot);
-            if (item != null && isMatchingStone(item, stoneType)) {
+        for (Map.Entry<Integer, ItemStack> entry : bagData.getAllItems().entrySet()) {
+            if (deducted >= amount) break;
+            int slot = entry.getKey();
+            ItemStack item = entry.getValue();
+            if (isMatchingStone(item, stoneType)) {
                 int toDeduct = Math.min(item.getAmount(), amount - deducted);
                 if (toDeduct > 0) {
                     if (item.getAmount() > toDeduct) {
@@ -441,14 +443,19 @@ public class ChuwudaiAPI {
 
         String bagId = BagItem.getBagId(bagItem);
 
-        for (int slot = 0; slot < bagData.getSize(); slot++) {
-            ItemStack item = bagData.getItem(slot);
-            if (item == null) continue;
+        int remainingCount = needed.values().stream().mapToInt(Integer::intValue).sum();
 
-            for (String stoneType : new java.util.ArrayList<>(remaining.keySet())) {
-                int need = remaining.get(stoneType);
+        for (Map.Entry<Integer, ItemStack> entry : bagData.getAllItems().entrySet()) {
+            int slot = entry.getKey();
+            ItemStack item = entry.getValue();
+
+            java.util.Iterator<Map.Entry<String, Integer>> iter = remaining.entrySet().iterator();
+            while (iter.hasNext()) {
+                Map.Entry<String, Integer> stoneEntry = iter.next();
+                String stoneType = stoneEntry.getKey();
+                int need = stoneEntry.getValue();
                 if (need <= 0) {
-                    remaining.remove(stoneType);
+                    iter.remove();
                     continue;
                 }
                 if (isMatchingStone(item, stoneType)) {
@@ -459,13 +466,18 @@ public class ChuwudaiAPI {
                     } else {
                         bagData.removeItemSilent(slot);
                     }
-                    remaining.put(stoneType, need - toDeduct);
+                    if (toDeduct == need) {
+                        iter.remove();
+                    } else {
+                        stoneEntry.setValue(need - toDeduct);
+                    }
                     deducted.merge(stoneType, toDeduct, Integer::sum);
+                    remainingCount -= toDeduct;
                     break;
                 }
             }
 
-            if (remaining.isEmpty() || remaining.values().stream().allMatch(v -> v <= 0)) {
+            if (remainingCount <= 0) {
                 break;
             }
         }
