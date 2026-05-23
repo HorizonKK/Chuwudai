@@ -289,7 +289,18 @@ public class BagCommand implements CommandExecutor {
         player.sendMessage(ColorUtils.translateColorCodes(prefix + "&7扣除结果: " + (result.isSuccess() ? "&a成功" : "&c失败")));
         player.sendMessage(ColorUtils.translateColorCodes(prefix + "&7实际扣除数量: &f" + result.getDeductedAmount()));
         player.sendMessage(ColorUtils.translateColorCodes(prefix + "&7消息: &f" + result.getMessage()));
-        player.sendMessage(ColorUtils.translateColorCodes(prefix + "&7耗时: &e" + String.format("%.3f", elapsed / 1_000_000.0) + " ms &7(&e" + elapsed + " ns&7)"));
+        player.sendMessage(ColorUtils.translateColorCodes(prefix + "&7总耗时: &e" + String.format("%.3f", elapsed / 1_000_000.0) + " ms"));
+        // 分阶段耗时
+        Map<String, Long> timings = result.getTimings();
+        if (!timings.isEmpty()) {
+            player.sendMessage(ColorUtils.translateColorCodes(prefix + "&6--- 分阶段耗时 ---"));
+            printTimingLine(player, prefix, timings, "load", "加载数据");
+            printTimingLine(player, prefix, timings, "precheck", "预检数量");
+            printTimingLine(player, prefix, timings, "scan", "槽位扫描");
+            printTimingLine(player, prefix, timings, "save", "数据保存");
+            printTimingLine(player, prefix, timings, "lore", "Lore更新");
+            printTimingLine(player, prefix, timings, "total", "合计(API)");
+        }
 
         if (result.isSuccess()) {
             player.sendMessage(ColorUtils.translateColorCodes(prefix + "&a✓ 灵石扣除测试通过！"));
@@ -331,7 +342,18 @@ public class BagCommand implements CommandExecutor {
             }
             player.sendMessage(ColorUtils.translateColorCodes(prefix + "&7不足: " + remainingStr));
         }
-        player.sendMessage(ColorUtils.translateColorCodes(prefix + "&7耗时: &e" + String.format("%.3f", elapsed / 1_000_000.0) + " ms &7(&e" + elapsed + " ns&7)"));
+        player.sendMessage(ColorUtils.translateColorCodes(prefix + "&7总耗时: &e" + String.format("%.3f", elapsed / 1_000_000.0) + " ms"));
+        // 分阶段耗时
+        Map<String, Long> timings = result.getTimings();
+        if (!timings.isEmpty()) {
+            player.sendMessage(ColorUtils.translateColorCodes(prefix + "&6--- 分阶段耗时 ---"));
+            printTimingLine(player, prefix, timings, "load", "加载数据");
+            printTimingLine(player, prefix, timings, "precheck", "预检数量");
+            printTimingLine(player, prefix, timings, "scan", "槽位扫描");
+            printTimingLine(player, prefix, timings, "save", "数据保存");
+            printTimingLine(player, prefix, timings, "lore", "Lore更新");
+            printTimingLine(player, prefix, timings, "total", "合计(API)");
+        }
     }
 
     private String getChineseName(String apiStoneType) {
@@ -455,6 +477,15 @@ public class BagCommand implements CommandExecutor {
             case 81: return "大型";
             case 108: return "巨型";
             default: return "";
+        }
+    }
+
+    private void printTimingLine(Player player, String prefix, Map<String, Long> timings, String key, String label) {
+        Long ns = timings.get(key);
+        if (ns != null) {
+            double ms = ns / 1_000_000.0;
+            player.sendMessage(ColorUtils.translateColorCodes(
+                    prefix + "  &7" + label + ": &e" + String.format("%.3f", ms) + " ms &7(&e" + ns + " ns&7)"));
         }
     }
 }

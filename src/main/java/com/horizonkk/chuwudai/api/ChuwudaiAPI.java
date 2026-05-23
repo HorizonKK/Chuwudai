@@ -191,13 +191,14 @@ public class ChuwudaiAPI {
         BagData bagData = bagManager.getBagData(bagId);
         if (bagData == null) return 0;
 
-        return deductStoneFromBagSlot(player, bagSlot, stoneType, amount, bagData);
+        return deductStoneFromBagSlot(player, bagSlot, stoneType, amount, bagData, null);
     }
 
     /**
      * 从指定槽位的储物袋中扣除灵石（传入已获取的BagData，避免重复查询）
+     * @param timings 可选的耗时记录Map，为null时不记录
      */
-    private static int deductStoneFromBagSlot(Player player, int bagSlot, String stoneType, int amount, BagData bagData) {
+    private static int deductStoneFromBagSlot(Player player, int bagSlot, String stoneType, int amount, BagData bagData, Map<String, Long> timings) {
         PlayerInventory inventory = player.getInventory();
         ItemStack bagItem = inventory.getItem(bagSlot);
 
@@ -208,6 +209,8 @@ public class ChuwudaiAPI {
         String bagId = BagItem.getBagId(bagItem);
         int deducted = 0;
 
+        // 阶段3: 槽位扫描扣除
+        long tScan = System.nanoTime();
         for (Map.Entry<Integer, ItemStack> entry : bagData.getAllItems().entrySet()) {
             if (deducted >= amount) break;
             int slot = entry.getKey();
@@ -225,12 +228,21 @@ public class ChuwudaiAPI {
                 }
             }
         }
+        if (timings != null) timings.put("scan", System.nanoTime() - tScan);
 
         if (deducted > 0) {
             bagData.decrementStoneCount(stoneType, deducted);
+
+            // 阶段4: 数据保存
+            long tSave = System.nanoTime();
             bagManager.saveBagData(bagId);
+            if (timings != null) timings.put("save", System.nanoTime() - tSave);
+
+            // 阶段5: Lore更新
+            long tLore = System.nanoTime();
             BagItem.updateBagLore(bagItem, bagData.getStoneCounts(), bagData);
             inventory.setItem(bagSlot, bagItem);
+            if (timings != null) timings.put("lore", System.nanoTime() - tLore);
         }
 
         return deducted;
@@ -249,6 +261,11 @@ public class ChuwudaiAPI {
             return new StoneDeductionResult(0, "扣除数量必须大于0");
         }
 
+        Map<String, Long> timings = new java.util.LinkedHashMap<>();
+        long totalStart = System.nanoTime();
+
+        // 阶段1: 加载储物袋数据
+        long t0 = System.nanoTime();
         PlayerInventory inventory = player.getInventory();
         ItemStack bagItem = inventory.getItem(bagSlot);
 
@@ -262,25 +279,30 @@ public class ChuwudaiAPI {
 
         String bagId = BagItem.getBagId(bagItem);
         BagData bagData = bagManager.getBagData(bagId);
+        timings.put("load", System.nanoTime() - t0);
 
         if (bagData == null) {
             return new StoneDeductionResult(0, "无法加载储物袋数据");
         }
 
-        // 检查储物袋中是否有足够的灵石
+        // 阶段2: 预检灵石数量
+        long t1 = System.nanoTime();
         int available = bagData.getStoneCounts().getOrDefault(stoneType, 0);
+        timings.put("precheck", System.nanoTime() - t1);
 
         if (available < amount) {
-            return new StoneDeductionResult(0, "储物袋中" + getStoneDisplayName(stoneType) + "不足，需要" + amount + "个，只有" + available + "个");
+            timings.put("total", System.nanoTime() - totalStart);
+            return new StoneDeductionResult(0, "储物袋中" + getStoneDisplayName(stoneType) + "不足，需要" + amount + "个，只有" + available + "个", timings);
         }
 
-        // 执行扣除，传入已获取的bagData避免重复查询
-        int deducted = deductStoneFromBagSlot(player, bagSlot, stoneType, amount, bagData);
+        // 阶段3-5: 执行扣除（内部计时 scan/save/lore）
+        int deducted = deductStoneFromBagSlot(player, bagSlot, stoneType, amount, bagData, timings);
+        timings.put("total", System.nanoTime() - totalStart);
 
         if (deducted == amount) {
-            return new StoneDeductionResult(deducted, "成功从储物袋扣除" + deducted + "个" + getStoneDisplayName(stoneType));
+            return new StoneDeductionResult(deducted, "成功从储物袋扣除" + deducted + "个" + getStoneDisplayName(stoneType), timings);
         } else {
-            return new StoneDeductionResult(deducted, "扣除异常：期望扣除" + amount + "个，实际扣除" + deducted + "个");
+            return new StoneDeductionResult(deducted, "扣除异常：期望扣除" + amount + "个，实际扣除" + deducted + "个", timings);
         }
     }
 
@@ -311,7 +333,7 @@ public class ChuwudaiAPI {
 
                     if (available > 0) {
                         int toDeduct = Math.min(available, amount - totalDeducted);
-                        int actuallyDeducted = deductStoneFromBagSlot(player, slot, stoneType, toDeduct, bagData);
+                        int actuallyDeducted = deductStoneFromBagSlot(player, slot, stoneType, toDeduct, bagData, null);
                         totalDeducted += actuallyDeducted;
 
                         if (totalDeducted >= amount) {
@@ -346,6 +368,11 @@ public class ChuwudaiAPI {
             return new BatchStoneDeductionResult(new HashMap<>(), new HashMap<>());
         }
 
+        Map<String, Long> timings = new java.util.LinkedHashMap<>();
+        long totalStart = System.nanoTime();
+
+        // 阶段1: 加载储物袋数据
+        long t0 = System.nanoTime();
         PlayerInventory inventory = player.getInventory();
         ItemStack bagItem = inventory.getItem(bagSlot);
 
@@ -358,24 +385,28 @@ public class ChuwudaiAPI {
 
         String bagId = BagItem.getBagId(bagItem);
         BagData bagData = bagManager.getBagData(bagId);
+        timings.put("load", System.nanoTime() - t0);
 
         if (bagData == null) {
             return new BatchStoneDeductionResult(new HashMap<>(), new HashMap<>(requiredStones));
         }
 
-        // 预检可用量
+        // 阶段2: 预检可用量
+        long t1 = System.nanoTime();
         Map<String, Integer> available = bagData.getStoneCounts();
         Map<String, Integer> needed = new HashMap<>();
         for (Map.Entry<String, Integer> entry : requiredStones.entrySet()) {
             int avail = available.getOrDefault(entry.getKey(), 0);
             needed.put(entry.getKey(), Math.min(entry.getValue(), avail));
         }
+        timings.put("precheck", System.nanoTime() - t1);
 
-        // 单次扫描扣除
-        Map<String, Integer> deducted = deductStonesFromBag(player, bagSlot, needed, bagData);
+        // 阶段3-5: 单次扫描扣除（内部计时 scan/save/lore）
+        Map<String, Integer> deducted = deductStonesFromBag(player, bagSlot, needed, bagData, timings);
+        timings.put("total", System.nanoTime() - totalStart);
 
         return new BatchStoneDeductionResult(deducted,
-                computeRemaining(requiredStones, deducted));
+                computeRemaining(requiredStones, deducted), timings);
     }
 
     /**
@@ -415,7 +446,7 @@ public class ChuwudaiAPI {
 
             if (neededFromBag.isEmpty()) continue;
 
-            Map<String, Integer> deducted = deductStonesFromBag(player, slot, neededFromBag, bagData);
+            Map<String, Integer> deducted = deductStonesFromBag(player, slot, neededFromBag, bagData, null);
             for (Map.Entry<String, Integer> entry : deducted.entrySet()) {
                 remaining.merge(entry.getKey(), -entry.getValue(), Integer::sum);
                 totalDeducted.merge(entry.getKey(), entry.getValue(), Integer::sum);
@@ -433,7 +464,7 @@ public class ChuwudaiAPI {
      * 核心扣除逻辑：单次扫描储物袋扣除多种灵石
      * @return 实际扣除量 Map<灵石类型, 扣除数量>
      */
-    private static Map<String, Integer> deductStonesFromBag(Player player, int bagSlot, Map<String, Integer> needed, BagData bagData) {
+    private static Map<String, Integer> deductStonesFromBag(Player player, int bagSlot, Map<String, Integer> needed, BagData bagData, Map<String, Long> timings) {
         Map<String, Integer> remaining = new HashMap<>(needed);
         Map<String, Integer> deducted = new HashMap<>();
 
@@ -445,6 +476,8 @@ public class ChuwudaiAPI {
 
         int remainingCount = needed.values().stream().mapToInt(Integer::intValue).sum();
 
+        // 阶段3: 槽位扫描扣除
+        long tScan = System.nanoTime();
         for (Map.Entry<Integer, ItemStack> entry : bagData.getAllItems().entrySet()) {
             int slot = entry.getKey();
             ItemStack item = entry.getValue();
@@ -481,6 +514,7 @@ public class ChuwudaiAPI {
                 break;
             }
         }
+        if (timings != null) timings.put("scan", System.nanoTime() - tScan);
 
         remaining.values().removeIf(v -> v <= 0);
 
@@ -489,9 +523,17 @@ public class ChuwudaiAPI {
             for (Map.Entry<String, Integer> entry : deducted.entrySet()) {
                 bagData.decrementStoneCount(entry.getKey(), entry.getValue());
             }
+
+            // 阶段4: 数据保存
+            long tSave = System.nanoTime();
             bagManager.saveBagData(bagId);
+            if (timings != null) timings.put("save", System.nanoTime() - tSave);
+
+            // 阶段5: Lore更新
+            long tLore = System.nanoTime();
             BagItem.updateBagLore(bagItem, bagData.getStoneCounts(), bagData);
             inventory.setItem(bagSlot, bagItem);
+            if (timings != null) timings.put("lore", System.nanoTime() - tLore);
         }
 
         return deducted;
@@ -658,24 +700,23 @@ public class ChuwudaiAPI {
         private final int deductedAmount;
         private final String message;
         private final boolean success;
+        private final Map<String, Long> timings;
 
         public StoneDeductionResult(int deductedAmount, String message) {
+            this(deductedAmount, message, new java.util.LinkedHashMap<>());
+        }
+
+        public StoneDeductionResult(int deductedAmount, String message, Map<String, Long> timings) {
             this.deductedAmount = deductedAmount;
             this.message = message;
             this.success = deductedAmount > 0;
+            this.timings = new java.util.LinkedHashMap<>(timings);
         }
 
-        public int getDeductedAmount() {
-            return deductedAmount;
-        }
-
-        public String getMessage() {
-            return message;
-        }
-
-        public boolean isSuccess() {
-            return success;
-        }
+        public int getDeductedAmount() { return deductedAmount; }
+        public String getMessage() { return message; }
+        public boolean isSuccess() { return success; }
+        public Map<String, Long> getTimings() { return new java.util.LinkedHashMap<>(timings); }
 
         @Override
         public String toString() {
@@ -695,11 +736,17 @@ public class ChuwudaiAPI {
         private final Map<String, Integer> remainingAmounts;
         private final boolean allSuccess;
         private final String message;
+        private final Map<String, Long> timings;
 
         public BatchStoneDeductionResult(Map<String, Integer> deductedAmounts, Map<String, Integer> remainingAmounts) {
+            this(deductedAmounts, remainingAmounts, new java.util.LinkedHashMap<>());
+        }
+
+        public BatchStoneDeductionResult(Map<String, Integer> deductedAmounts, Map<String, Integer> remainingAmounts, Map<String, Long> timings) {
             this.deductedAmounts = new HashMap<>(deductedAmounts);
             this.remainingAmounts = new HashMap<>(remainingAmounts);
             this.allSuccess = remainingAmounts.isEmpty();
+            this.timings = new java.util.LinkedHashMap<>(timings);
 
             StringBuilder sb = new StringBuilder();
             if (allSuccess) {
@@ -729,6 +776,7 @@ public class ChuwudaiAPI {
         public Map<String, Integer> getRemainingAmounts() { return new HashMap<>(remainingAmounts); }
         public boolean isAllSuccess() { return allSuccess; }
         public String getMessage() { return message; }
+        public Map<String, Long> getTimings() { return new java.util.LinkedHashMap<>(timings); }
 
         @Override
         public String toString() {
