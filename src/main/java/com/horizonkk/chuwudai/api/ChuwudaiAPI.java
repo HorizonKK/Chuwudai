@@ -233,9 +233,11 @@ public class ChuwudaiAPI {
         if (deducted > 0) {
             bagData.decrementStoneCount(stoneType, deducted);
 
-            // 阶段4: 数据保存
+            // 阶段4: 数据保存（异步写盘，内存状态已就绪）
             long tSave = System.nanoTime();
-            bagManager.saveBagData(bagId);
+            final String saveBagId = bagId;
+            Chuwudai.getInstance().getServer().getScheduler().runTaskAsynchronously(
+                Chuwudai.getInstance(), () -> bagManager.saveBagData(saveBagId));
             if (timings != null) timings.put("save", System.nanoTime() - tSave);
 
             // 阶段5: Lore更新
@@ -524,9 +526,11 @@ public class ChuwudaiAPI {
                 bagData.decrementStoneCount(entry.getKey(), entry.getValue());
             }
 
-            // 阶段4: 数据保存
+            // 阶段4: 数据保存（异步写盘，内存状态已就绪）
             long tSave = System.nanoTime();
-            bagManager.saveBagData(bagId);
+            final String saveBagId = bagId;
+            Chuwudai.getInstance().getServer().getScheduler().runTaskAsynchronously(
+                Chuwudai.getInstance(), () -> bagManager.saveBagData(saveBagId));
             if (timings != null) timings.put("save", System.nanoTime() - tSave);
 
             // 阶段5: Lore更新
