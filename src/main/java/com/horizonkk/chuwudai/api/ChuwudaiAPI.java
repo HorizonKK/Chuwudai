@@ -173,6 +173,149 @@ public class ChuwudaiAPI {
     }
 
     /**
+     * 查询玩家背包中指定品质的灵石数量（仅背包，不含储物袋）
+     * @param player 玩家
+     * @param stoneType 灵石类型（&f下品灵石/&a中品灵石/&e上品灵石/&c极品灵石）
+     * @return 灵石数量
+     */
+    public static int countStoneInPlayerInventory(Player player, String stoneType) {
+        int count = 0;
+        PlayerInventory inventory = player.getInventory();
+        for (int slot = 0; slot < 36; slot++) {
+            ItemStack item = inventory.getItem(slot);
+            if (item != null && isMatchingStone(item, stoneType)) {
+                count += item.getAmount();
+            }
+        }
+        return count;
+    }
+
+    /**
+     * 查询玩家背包+指定槽位储物袋中指定品质的灵石总量
+     * @param player 玩家
+     * @param stoneType 灵石类型（&f下品灵石/&a中品灵石/&e上品灵石/&c极品灵石）
+     * @param bagSlot 储物袋所在槽位（0-35）
+     * @return 灵石总量
+     */
+    public static int countStoneInPlayerAndBagSlot(Player player, String stoneType, int bagSlot) {
+        int count = countStoneInPlayerInventory(player, stoneType);
+
+        PlayerInventory inventory = player.getInventory();
+        ItemStack bagItem = inventory.getItem(bagSlot);
+        if (bagItem != null && BagItem.isBagItem(bagItem)) {
+            String bagId = BagItem.getBagId(bagItem);
+            BagData bagData = bagManager.getBagData(bagId);
+            if (bagData != null) {
+                count += bagData.getStoneCounts().getOrDefault(stoneType, 0);
+            }
+        }
+
+        return count;
+    }
+
+    /**
+     * 查询玩家背包+所有储物袋中指定品质的灵石总量
+     * @param player 玩家
+     * @param stoneType 灵石类型（&f下品灵石/&a中品灵石/&e上品灵石/&c极品灵石）
+     * @return 灵石总量
+     */
+    public static int countStoneInPlayerAndAllBags(Player player, String stoneType) {
+        int count = countStoneInPlayerInventory(player, stoneType);
+
+        PlayerInventory inventory = player.getInventory();
+        for (int slot = 0; slot < 36; slot++) {
+            ItemStack item = inventory.getItem(slot);
+            if (item != null && BagItem.isBagItem(item)) {
+                String bagId = BagItem.getBagId(item);
+                BagData bagData = bagManager.getBagData(bagId);
+                if (bagData != null) {
+                    count += bagData.getStoneCounts().getOrDefault(stoneType, 0);
+                }
+            }
+        }
+
+        return count;
+    }
+
+    /**
+     * 优先从玩家背包扣除灵石，背包不足时自动从储物袋补充扣除
+     * @param player 玩家
+     * @param stoneType 灵石类型（&f下品灵石/&a中品灵石/&e上品灵石/&c极品灵石）
+     * @param amount 要扣除的数量
+     * @return 扣除结果
+     */
+    public static StoneDeductionResult deductStoneFromPlayerFirst(Player player, String stoneType, int amount) {
+        if (amount <= 0) {
+            return new StoneDeductionResult(0, "扣除数量必须大于0");
+        }
+
+        int fromInventory = deductStoneFromPlayerInventory(player, stoneType, amount);
+
+        if (fromInventory >= amount) {
+            return new StoneDeductionResult(fromInventory,
+                    "成功从背包扣除" + fromInventory + "个" + getStoneDisplayName(stoneType));
+        }
+
+        int remaining = amount - fromInventory;
+        StoneDeductionResult bagResult = deductStoneFromAnyBag(player, stoneType, remaining);
+        int totalDeducted = fromInventory + bagResult.getDeductedAmount();
+
+        if (totalDeducted >= amount) {
+            return new StoneDeductionResult(totalDeducted,
+                    "从背包扣除" + fromInventory + "个，从储物袋扣除" + bagResult.getDeductedAmount() + "个" + getStoneDisplayName(stoneType));
+        } else if (totalDeducted > 0) {
+            return new StoneDeductionResult(totalDeducted,
+                    "部分扣除成功：从背包扣除" + fromInventory + "个，从储物袋扣除" + bagResult.getDeductedAmount() + "个" + getStoneDisplayName(stoneType) + "，还差" + (amount - totalDeducted) + "个");
+        } else {
+            return new StoneDeductionResult(0,
+                    "背包和储物袋中都没有足够的" + getStoneDisplayName(stoneType));
+        }
+    }
+
+    /**
+     * 优先从玩家背包批量扣除多种灵石，背包不足时自动从储物袋补充扣除
+     * @param player 玩家
+     * @param requiredStones 需要扣除的灵石 Map<灵石类型, 数量>
+     * @return 批量扣除结果
+     */
+    public static BatchStoneDeductionResult deductStonesFromPlayerFirst(Player player, Map<String, Integer> requiredStones) {
+        if (requiredStones == null || requiredStones.isEmpty()) {
+            return new BatchStoneDeductionResult(new HashMap<>(), new HashMap<>());
+        }
+
+        Map<String, Integer> remaining = new HashMap<>(requiredStones);
+        Map<String, Integer> totalDeducted = new HashMap<>();
+
+        // 阶段1: 从玩家背包扣除
+        for (Map.Entry<String, Integer> entry : requiredStones.entrySet()) {
+            String stoneType = entry.getKey();
+            int needed = entry.getValue();
+            int deducted = deductStoneFromPlayerInventory(player, stoneType, needed);
+            if (deducted > 0) {
+                totalDeducted.put(stoneType, deducted);
+                int left = needed - deducted;
+                if (left > 0) {
+                    remaining.put(stoneType, left);
+                } else {
+                    remaining.remove(stoneType);
+                }
+            }
+        }
+
+        // 阶段2: 背包不足的部分从储物袋扣除
+        if (!remaining.isEmpty()) {
+            BatchStoneDeductionResult bagResult = deductStonesFromAnyBag(player, remaining);
+            for (Map.Entry<String, Integer> entry : bagResult.getDeductedAmounts().entrySet()) {
+                totalDeducted.merge(entry.getKey(), entry.getValue(), Integer::sum);
+            }
+            remaining = bagResult.getRemainingAmounts();
+        }
+
+        remaining.values().removeIf(v -> v <= 0);
+        return new BatchStoneDeductionResult(totalDeducted, remaining);
+    }
+
+    /**
      * 从指定槽位的储物袋中扣除灵石
      * @param player 玩家
      * @param bagSlot 储物袋在背包中的槽位（0-35）
