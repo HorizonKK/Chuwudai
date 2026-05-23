@@ -136,18 +136,14 @@ public class PillListener implements Listener {
                 }
             }
 
-            // 异步保存数据，避免频繁更新Lore
+            // 更新丹瓶物品的Lore（必须在主线程操作物品Meta）
+            ItemStack pillItem = findPillItem(event.getWhoClicked(), pillInventory.getPillData().getId());
+            if (pillItem != null) {
+                PillItem.updatePillLore(pillItem, pillInventory.getPillData().getPillNames());
+            }
+            // 异步保存数据
             Chuwudai.getInstance().getServer().getScheduler().runTaskAsynchronously(Chuwudai.getInstance(), () -> {
                 pillInventory.saveItems();
-                // 更新丹瓶物品的Lore
-                ItemStack pillItem = findPillItem(event.getWhoClicked(), pillInventory.getPillData().getId());
-                if (pillItem != null) {
-                    // 获取PillData和丹药名称
-                    PillData pillData = pillInventory.getPillData();
-                    List<String> pillNames = pillData.getPillNames();
-                    // 更新Lore
-                    PillItem.updatePillLore(pillItem, pillNames);
-                }
             });
         }
     }

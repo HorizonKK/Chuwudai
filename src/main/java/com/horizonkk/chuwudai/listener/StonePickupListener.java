@@ -92,25 +92,22 @@ public class StonePickupListener implements Listener {
                     Chuwudai.getInstance().getConfig().getString("messages.stone-pickup", "&a已自动存入 %amount% 个 %stone%")
                             .replace("%amount%", String.valueOf(storedAmount))
                             .replace("%stone%", stoneName)));
-            // 更新储物袋Lore
+            // 更新储物袋Lore（必须在主线程操作物品Meta，否则PDC数据可能丢失导致储物袋变回普通纸）
+            BagData freshBagData = Chuwudai.getInstance().getBagManager().getBagData(bagId);
+            if (freshBagData != null) {
+                Map<String, Integer> stoneCounts = freshBagData.getStoneCounts();
+                ItemStack currentBagItem = requireSlotZero ?
+                        player.getInventory().getItem(9) :
+                        findBagInInventory(player);
+                if (currentBagItem != null) {
+                    BagItem.updateBagLore(currentBagItem, stoneCounts);
+                }
+            }
+            // 异步保存数据
             new BukkitRunnable() {
                 @Override
                 public void run() {
-                    // 获取BagData和灵石数量
-                    BagData bagData = Chuwudai.getInstance().getBagManager().getBagData(bagId);
-                    if (bagData != null) {
-                        Map<String, Integer> stoneCounts = bagData.getStoneCounts();
-                        // 重新从玩家背包获取储物袋，确保引用是最新的
-                        ItemStack currentBagItem = requireSlotZero ?
-                                player.getInventory().getItem(9) :
-                                findBagInInventory(player);
-                        if (currentBagItem != null) {
-                            BagItem.updateBagLore(currentBagItem, stoneCounts);
-                        }
-                        Chuwudai.getInstance().getBagManager().saveBagData(bagId);
-                        // 强制刷新玩家背包显示
-                        player.updateInventory();
-                    }
+                    Chuwudai.getInstance().getBagManager().saveBagData(bagId);
                 }
             }.runTaskAsynchronously(Chuwudai.getInstance());
         }
