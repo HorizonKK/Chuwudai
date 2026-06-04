@@ -13,7 +13,7 @@ commands:
   chuwudai:
     description: 储物袋主命令
     aliases: [cd, bag]
-    usage: /<command> <give|open|reload|help>
+    usage: /<command> <give|open|tempbox|reload|help>
 
 permissions:
   chuwudai.give:
@@ -22,6 +22,12 @@ permissions:
   chuwudai.open:
     description: 允许打开储物袋
     default: true
+  chuwudai.tempbox:
+    description: 允许打开暂存箱
+    default: true
+  chuwudai.tempbox.others:
+    description: 允许打开其他玩家的暂存箱
+    default: op
   chuwudai.test:
     description: 允许测试物品匹配
     default: op
@@ -34,4 +40,6 @@ permissions:
     children:
       chuwudai.give: true
       chuwudai.open: true
+      chuwudai.tempbox: true
+      chuwudai.tempbox.others: true
       chuwudai.reload: true

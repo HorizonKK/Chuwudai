@@ -11,6 +11,8 @@ import com.horizonkk.chuwudai.listener.StonePickupListener;
 import com.horizonkk.chuwudai.pill.PillDataManager;
 import com.horizonkk.chuwudai.pill.PillManager;
 import com.horizonkk.chuwudai.pill.PillUseEvent;
+import com.horizonkk.chuwudai.Temporary.TempBoxListener;
+import com.horizonkk.chuwudai.Temporary.TempBoxManager;
 import com.horizonkk.chuwudai.utlis.DatabaseManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -21,6 +23,7 @@ public final class Chuwudai extends JavaPlugin {
     private BagDataManager dataManager;
     private PillManager pillManager;
     private PillDataManager pillDataManager;
+    private TempBoxManager tempBoxManager;
 
     @Override
     public void onEnable() {
@@ -34,6 +37,7 @@ public final class Chuwudai extends JavaPlugin {
         this.bagManager = new BagManager();
         this.pillDataManager = new PillDataManager();
         this.pillManager = new PillManager();
+        this.tempBoxManager = new TempBoxManager();
 
         // 注册命令
         getCommand("chuwudai").setExecutor(new BagCommand());
@@ -45,6 +49,7 @@ public final class Chuwudai extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new BagOperationRestrictionListener(), this);
         getServer().getPluginManager().registerEvents(new PillListener(), this);
         getServer().getPluginManager().registerEvents(new PillUseEvent(), this);
+        getServer().getPluginManager().registerEvents(new TempBoxListener(), this);
 
         // 注册 PlaceholderAPI 扩展
         if (getServer().getPluginManager().getPlugin("PlaceholderAPI") != null) {
@@ -94,5 +99,9 @@ public final class Chuwudai extends JavaPlugin {
 
     public PillDataManager getPillDataManager() {
         return pillDataManager;
+    }
+
+    public TempBoxManager getTempBoxManager() {
+        return tempBoxManager;
     }
 }

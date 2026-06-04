@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(jar tf *)",
-      "Bash(javap *)"
+      "Bash(javap *)",
+      "Bash(git *)"
     ]
   }
 }

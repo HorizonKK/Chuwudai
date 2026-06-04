@@ -3,6 +3,7 @@ package com.horizonkk.chuwudai.command;
 import com.horizonkk.chuwudai.Chuwudai;
 import com.horizonkk.chuwudai.api.ChuwudaiAPI;
 import com.horizonkk.chuwudai.bag.BagManager;
+import com.horizonkk.chuwudai.Temporary.TempBoxManager;
 import com.horizonkk.chuwudai.utlis.BundleStyle;
 import com.horizonkk.chuwudai.utlis.ColorUtils;
 import com.horizonkk.chuwudai.utlis.getSize;
@@ -122,6 +123,29 @@ public class BagCommand implements CommandExecutor {
 
                 String bagId = args[1];
                 bagManager.openBag((Player) sender, bagId);
+                break;
+
+            case "tempbox":
+                if (!(sender instanceof Player)) {
+                    sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&c只有玩家才能使用此命令！"));
+                    return true;
+                }
+                if (!sender.hasPermission("chuwudai.tempbox")) {
+                    sender.sendMessage(ColorUtils.translateColorCodes(prefix + Chuwudai.getInstance().getConfig().getString("messages.no-permission", "&c你没有权限执行此命令！")));
+                    return true;
+                }
+
+                if (args.length >= 2 && sender.hasPermission("chuwudai.tempbox.others")) {
+                    Player targetPlayer = Bukkit.getPlayer(args[1]);
+                    if (targetPlayer == null) {
+                        sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&c玩家 &e" + args[1] + " &c不在线！"));
+                        return true;
+                    }
+                    Chuwudai.getInstance().getTempBoxManager().openTempBox(targetPlayer);
+                    sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&a已打开玩家 &e" + targetPlayer.getName() + " &a的暂存箱"));
+                } else {
+                    Chuwudai.getInstance().getTempBoxManager().openTempBox((Player) sender);
+                }
                 break;
 
             case "reload":
@@ -396,6 +420,9 @@ public class BagCommand implements CommandExecutor {
         }
         if (sender.hasPermission("chuwudai.open")) {
             sender.sendMessage(ColorUtils.translateColorCodes("&e/chuwudai open <ID> &7- 打开指定ID的储物袋"));
+        }
+        if (sender.hasPermission("chuwudai.tempbox")) {
+            sender.sendMessage(ColorUtils.translateColorCodes("&e/chuwudai tempbox [玩家] &7- 打开暂存箱(54格，关服自动清理)"));
         }
         if (sender.hasPermission("chuwudai.reload")) {
             sender.sendMessage(ColorUtils.translateColorCodes("&e/chuwudai reload &7- 重载插件配置文件"));

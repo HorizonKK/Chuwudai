@@ -7,12 +7,14 @@ import com.horizonkk.chuwudai.bag.BagManager;
 import com.horizonkk.chuwudai.pill.PillData;
 import com.horizonkk.chuwudai.pill.PillItem;
 import com.horizonkk.chuwudai.pill.PillManager;
+import com.horizonkk.chuwudai.Temporary.TempBoxManager;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * Chuwudai插件API接口
@@ -23,6 +25,7 @@ public class ChuwudaiAPI {
     private static final Chuwudai plugin = Chuwudai.getInstance();
     private static final BagManager bagManager = plugin.getBagManager();
     private static final PillManager pillManager = plugin.getPillManager();
+    private static final TempBoxManager tempBoxManager = plugin.getTempBoxManager();
 
     // ==================== 储物袋API ====================
 
@@ -116,6 +119,119 @@ public class ChuwudaiAPI {
      */
     public static void savePillData(String pillId) {
         pillManager.savePillData(pillId);
+    }
+
+    // ==================== 暂存箱API ====================
+
+    /**
+     * 打开玩家的暂存箱界面
+     * @param player 玩家
+     */
+    public static void openTempBox(Player player) {
+        tempBoxManager.openTempBox(player);
+    }
+
+    /**
+     * 向玩家暂存箱添加物品（放入第一个空位）
+     * @param player 玩家
+     * @param item 要添加的物品
+     * @return 是否成功放入（暂存箱未满）
+     */
+    public static boolean addItemToTempBox(Player player, ItemStack item) {
+        return tempBoxManager.addItem(player.getUniqueId(), item);
+    }
+
+    /**
+     * 向指定玩家暂存箱添加物品（放入第一个空位）
+     * @param playerUuid 玩家UUID
+     * @param item 要添加的物品
+     * @return 是否成功放入（暂存箱未满）
+     */
+    public static boolean addItemToTempBox(UUID playerUuid, ItemStack item) {
+        return tempBoxManager.addItem(playerUuid, item);
+    }
+
+    /**
+     * 向玩家暂存箱指定槽位添加物品
+     * @param player 玩家
+     * @param slot 槽位 (0-53)
+     * @param item 要添加的物品
+     * @return 是否成功放入
+     */
+    public static boolean addItemToTempBoxSlot(Player player, int slot, ItemStack item) {
+        return tempBoxManager.addItemToSlot(player.getUniqueId(), slot, item);
+    }
+
+    /**
+     * 向指定玩家暂存箱指定槽位添加物品
+     * @param playerUuid 玩家UUID
+     * @param slot 槽位 (0-53)
+     * @param item 要添加的物品
+     * @return 是否成功放入
+     */
+    public static boolean addItemToTempBoxSlot(UUID playerUuid, int slot, ItemStack item) {
+        return tempBoxManager.addItemToSlot(playerUuid, slot, item);
+    }
+
+    /**
+     * 获取玩家暂存箱中的所有物品
+     * @param player 玩家
+     * @return 槽位到物品的映射（副本，修改不影响暂存箱）
+     */
+    public static Map<Integer, ItemStack> getTempBoxItems(Player player) {
+        Map<Integer, ItemStack> source = tempBoxManager.getPlayerItems(player.getUniqueId());
+        Map<Integer, ItemStack> copy = new HashMap<>();
+        for (Map.Entry<Integer, ItemStack> entry : source.entrySet()) {
+            copy.put(entry.getKey(), entry.getValue().clone());
+        }
+        return copy;
+    }
+
+    /**
+     * 获取指定玩家暂存箱中的所有物品
+     * @param playerUuid 玩家UUID
+     * @return 槽位到物品的映射（副本，修改不影响暂存箱）
+     */
+    public static Map<Integer, ItemStack> getTempBoxItems(UUID playerUuid) {
+        Map<Integer, ItemStack> source = tempBoxManager.getPlayerItems(playerUuid);
+        Map<Integer, ItemStack> copy = new HashMap<>();
+        for (Map.Entry<Integer, ItemStack> entry : source.entrySet()) {
+            copy.put(entry.getKey(), entry.getValue().clone());
+        }
+        return copy;
+    }
+
+    /**
+     * 清空玩家暂存箱
+     * @param player 玩家
+     */
+    public static void clearTempBox(Player player) {
+        tempBoxManager.clearBox(player.getUniqueId());
+    }
+
+    /**
+     * 清空指定玩家暂存箱
+     * @param playerUuid 玩家UUID
+     */
+    public static void clearTempBox(UUID playerUuid) {
+        tempBoxManager.clearBox(playerUuid);
+    }
+
+    /**
+     * 获取玩家暂存箱已使用槽位数
+     * @param player 玩家
+     * @return 已使用槽位数
+     */
+    public static int getTempBoxUsedSlots(Player player) {
+        return tempBoxManager.getUsedSlots(player.getUniqueId());
+    }
+
+    /**
+     * 获取暂存箱总大小
+     * @return 总槽位数 (54)
+     */
+    public static int getTempBoxSize() {
+        return tempBoxManager.getBoxSize();
     }
 
     // ==================== 灵石管理API ====================
