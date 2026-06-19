@@ -3,8 +3,10 @@ package com.horizonkk.chuwudai.bag;
 import com.horizonkk.chuwudai.Chuwudai;
 import com.horizonkk.chuwudai.utlis.BundleStyle;
 import com.horizonkk.chuwudai.utlis.ColorUtils;
+import org.bukkit.Bukkit;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.HashMap;
@@ -130,6 +132,44 @@ public class BagManager {
     }
 
     // 保存储物袋数据
+    public boolean isBagOpen(String bagId) {
+        if (bagId == null) return false;
+
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            Inventory topInventory = player.getOpenInventory().getTopInventory();
+            if (topInventory.getHolder() instanceof BagInventory) {
+                BagInventory bagInventory = (BagInventory) topInventory.getHolder();
+                if (bagId.equals(bagInventory.getBagData().getId())) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    public BagData upgradeBagSize(ItemStack bagItem, int additionalSlots) {
+        if (additionalSlots <= 0 || !BagItem.isBagItem(bagItem)) {
+            return null;
+        }
+
+        String bagId = BagItem.getBagId(bagItem);
+        if (isBagOpen(bagId)) {
+            return null;
+        }
+
+        BagData bagData = getBagData(bagId);
+        if (bagData == null) {
+            return null;
+        }
+
+        bagData.addSize(additionalSlots);
+        BagItem.setBagSize(bagItem, bagData.getSize());
+        BagItem.updateBagLore(bagItem, bagData.getStoneCounts(), bagData);
+        Chuwudai.getInstance().getDataManager().saveBag(bagData);
+        bagCache.put(bagId, bagData);
+        return bagData;
+    }
+
     public void saveBagData(String bagId) {
         if (bagCache.containsKey(bagId)) {
             Chuwudai.getInstance().getDataManager().saveBag(bagCache.get(bagId));

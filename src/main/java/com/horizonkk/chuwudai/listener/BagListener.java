@@ -5,6 +5,7 @@ import com.horizonkk.chuwudai.bag.BagData;
 import com.horizonkk.chuwudai.bag.BagInventory;
 import com.horizonkk.chuwudai.bag.BagItem;
 import com.horizonkk.chuwudai.bag.BagManager;
+import com.horizonkk.chuwudai.utlis.ColorUtils;
 import org.bukkit.Material;
 import org.bukkit.entity.HumanEntity;
 import org.bukkit.entity.Player;
@@ -21,6 +22,8 @@ import java.util.Map;
 public class BagListener implements Listener {
 
     private final BagManager bagManager;
+    private static final int BAG_UPGRADE_CUSTOM_MODEL_DATA = 10111;
+    private static final int BAG_UPGRADE_SLOTS = 9;
 
     public BagListener() {
         this.bagManager = Chuwudai.getInstance().getBagManager();
@@ -48,6 +51,10 @@ public class BagListener implements Listener {
     // 新添加：检测在背包中右键储物袋
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
+        if (handleBagUpgradeClick(event)) {
+            return;
+        }
+
         // 检查点击类型是否是右键
         if (event.getClick() != ClickType.RIGHT) {
             return;
@@ -169,6 +176,75 @@ public class BagListener implements Listener {
         }
     }
 
+
+    private boolean handleBagUpgradeClick(InventoryClickEvent event) {
+        ItemStack upgradeItem = event.getCursor();
+        ItemStack bagItem = event.getCurrentItem();
+
+        if (!isBagUpgradeItem(upgradeItem) || !BagItem.isBagItem(bagItem)) {
+            return false;
+        }
+
+        event.setCancelled(true);
+
+        if (!(event.getWhoClicked() instanceof Player)) {
+            return true;
+        }
+
+        Player player = (Player) event.getWhoClicked();
+        if (event.getView().getTopInventory().getHolder() instanceof BagInventory) {
+            sendBagMessage(player, "&c储物袋打开时不能升级，请先关闭储物袋界面！");
+            return true;
+        }
+
+        String bagId = BagItem.getBagId(bagItem);
+        if (bagManager.isBagOpen(bagId)) {
+            sendBagMessage(player, "&c储物袋打开时不能升级，请先关闭储物袋界面！");
+            return true;
+        }
+
+        BagData upgradedBag = bagManager.upgradeBagSize(bagItem, BAG_UPGRADE_SLOTS);
+        if (upgradedBag == null) {
+            sendBagMessage(player, "&c储物袋升级失败，数据不存在或当前无法升级！");
+            return true;
+        }
+
+        consumeOneCursorItem(event);
+        event.setCurrentItem(bagItem);
+        player.updateInventory();
+        sendBagMessage(player, "&a储物袋容量已增加一排，当前容量: &f" + upgradedBag.getSize() + " &a格");
+        return true;
+    }
+
+    private boolean isBagUpgradeItem(ItemStack item) {
+        if (item == null || item.getType() != Material.PAPER || !item.hasItemMeta()) {
+            return false;
+        }
+
+        ItemMeta meta = item.getItemMeta();
+        return meta.hasCustomModelData() && meta.getCustomModelData() == BAG_UPGRADE_CUSTOM_MODEL_DATA;
+    }
+
+    private void consumeOneCursorItem(InventoryClickEvent event) {
+        ItemStack cursorItem = event.getCursor();
+        if (cursorItem == null) {
+            return;
+        }
+
+        if (cursorItem.getAmount() <= 1) {
+            event.getWhoClicked().setItemOnCursor(null);
+            return;
+        }
+
+        ItemStack remaining = cursorItem.clone();
+        remaining.setAmount(cursorItem.getAmount() - 1);
+        event.getWhoClicked().setItemOnCursor(remaining);
+    }
+
+    private void sendBagMessage(Player player, String message) {
+        String prefix = Chuwudai.getInstance().getConfig().getString("messages.prefix", "&8[&6储物袋&8] &f");
+        player.sendMessage(ColorUtils.translateColorCodes(prefix + message));
+    }
 
     private ItemStack findBagItem(HumanEntity player, String bagId) {
         for (ItemStack item : player.getInventory().getContents()) {

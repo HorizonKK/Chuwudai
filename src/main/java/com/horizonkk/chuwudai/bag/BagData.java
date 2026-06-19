@@ -10,7 +10,7 @@ import java.util.Map;
 public class BagData {
     
     private final String id;
-    private final int size;
+    private int size;
     private final Map<Integer, ItemStack> items;
     private final Map<String, Integer> stoneCounts;
     
@@ -178,6 +178,20 @@ public class BagData {
     
     public String getId() { return id; }
     public int getSize() { return size; }
+
+    public void setSize(int size) {
+        if (size <= 0) {
+            throw new IllegalArgumentException("Bag size must be positive");
+        }
+        this.size = size;
+    }
+
+    public void addSize(int additionalSlots) {
+        if (additionalSlots <= 0) {
+            throw new IllegalArgumentException("Additional slots must be positive");
+        }
+        setSize(size + additionalSlots);
+    }
     public int getTotalPages() {
         // 每页实际存储45格，计算需要多少页
         return (int) Math.ceil((double) size / 45);

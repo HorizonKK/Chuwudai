@@ -87,6 +87,26 @@ public class BagItem {
     }
 
     // 检查是否是储物袋
+    public static Integer getBagSize(ItemStack item) {
+        if (item == null || !item.hasItemMeta()) return null;
+
+        ItemMeta meta = item.getItemMeta();
+        PersistentDataContainer data = meta.getPersistentDataContainer();
+
+        if (data.has(BAG_SIZE_KEY, PersistentDataType.INTEGER)) {
+            return data.get(BAG_SIZE_KEY, PersistentDataType.INTEGER);
+        }
+        return null;
+    }
+
+    public static void setBagSize(ItemStack item, int size) {
+        if (item == null || !item.hasItemMeta()) return;
+
+        ItemMeta meta = item.getItemMeta();
+        meta.getPersistentDataContainer().set(BAG_SIZE_KEY, PersistentDataType.INTEGER, size);
+        item.setItemMeta(meta);
+    }
+
     public static boolean isBagItem(ItemStack item) {
         return getBagId(item) != null;
     }

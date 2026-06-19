@@ -325,7 +325,6 @@ public class ChuwudaiAPI {
                 count += bagData.getStoneCounts().getOrDefault(stoneType, 0);
             }
         }
-
         return count;
     }
 
