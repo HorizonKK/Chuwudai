@@ -111,6 +111,15 @@ public class BagListener implements Listener {
 
         if (event.getInventory().getHolder() instanceof BagInventory) {
             BagInventory bagInventory = (BagInventory) event.getInventory().getHolder();
+            if (event.getWhoClicked() instanceof Player
+                    && Chuwudai.getInstance().getModBagBridge() != null
+                    && !Chuwudai.getInstance().getModBagBridge().isVanillaSession(
+                    (Player) event.getWhoClicked(), bagInventory.getBagData().getId())) {
+                event.setCancelled(true);
+                event.getWhoClicked().closeInventory();
+                return;
+            }
+
             if (event.getClickedInventory() != null
                     && event.getClickedInventory().getHolder() instanceof BagInventory
                     && bagInventory.isControlSlot(event.getSlot())) {
@@ -197,7 +206,6 @@ public class BagListener implements Listener {
             }
         }
     }
-
 
     private boolean handleBagUpgradeClick(InventoryClickEvent event) {
         ItemStack upgradeItem = event.getCursor();

@@ -85,6 +85,11 @@ public class BagManager {
 
     // 打开储物袋界面
     public void openBag(Player player, String bagId) {
+        if (Chuwudai.getInstance().getModBagBridge() != null
+                && Chuwudai.getInstance().getModBagBridge().openBag(player, bagId)) {
+            return;
+        }
+
         BagData bagData = getBagData(bagId);
         if (bagData == null) {
             int defaultSize = 27;
@@ -94,6 +99,9 @@ public class BagManager {
         }
         try {
             BagInventory inventory = new BagInventory(bagData);
+            if (Chuwudai.getInstance().getModBagBridge() != null) {
+                Chuwudai.getInstance().getModBagBridge().beginVanillaSession(player, bagId);
+            }
             inventory.open(player);
             player.sendMessage(ColorUtils.translateColorCodes(Chuwudai.getInstance().getConfig().getString("messages.prefix", "&8[&6储物袋&8] &f") +
                     Chuwudai.getInstance().getConfig().getString("messages.bag-opened", "&a已打开储物袋 %id%")
@@ -134,6 +142,11 @@ public class BagManager {
     // 保存储物袋数据
     public boolean isBagOpen(String bagId) {
         if (bagId == null) return false;
+
+        if (Chuwudai.getInstance().getModBagBridge() != null
+                && Chuwudai.getInstance().getModBagBridge().isBagOpen(bagId)) {
+            return true;
+        }
 
         for (Player player : Bukkit.getOnlinePlayers()) {
             Inventory topInventory = player.getOpenInventory().getTopInventory();

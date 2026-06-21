@@ -8,6 +8,7 @@ import com.horizonkk.chuwudai.listener.BagListener;
 import com.horizonkk.chuwudai.listener.BagOperationRestrictionListener;
 import com.horizonkk.chuwudai.listener.PillListener;
 import com.horizonkk.chuwudai.listener.StonePickupListener;
+import com.horizonkk.chuwudai.modbag.ModBagBridge;
 import com.horizonkk.chuwudai.pill.PillDataManager;
 import com.horizonkk.chuwudai.pill.PillManager;
 import com.horizonkk.chuwudai.pill.PillUseEvent;
@@ -24,6 +25,7 @@ public final class Chuwudai extends JavaPlugin {
     private PillManager pillManager;
     private PillDataManager pillDataManager;
     private TempBoxManager tempBoxManager;
+    private ModBagBridge modBagBridge;
 
     @Override
     public void onEnable() {
@@ -38,6 +40,8 @@ public final class Chuwudai extends JavaPlugin {
         this.pillDataManager = new PillDataManager();
         this.pillManager = new PillManager();
         this.tempBoxManager = new TempBoxManager();
+        this.modBagBridge = new ModBagBridge(this);
+        this.modBagBridge.register();
 
         // 注册命令
         getCommand("chuwudai").setExecutor(new BagCommand());
@@ -59,7 +63,6 @@ public final class Chuwudai extends JavaPlugin {
             getLogger().warning("PlaceholderAPI 未找到，变量功能将不可用！");
         }
 
-
         // 异步加载数据
         getServer().getScheduler().runTaskAsynchronously(this, () -> {
             dataManager.loadAllBags();
@@ -70,6 +73,9 @@ public final class Chuwudai extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (modBagBridge != null) {
+            modBagBridge.closeAll();
+        }
         // 保存所有数据
         dataManager.saveAllBags();
         pillDataManager.saveAllPills();
@@ -103,5 +109,9 @@ public final class Chuwudai extends JavaPlugin {
 
     public TempBoxManager getTempBoxManager() {
         return tempBoxManager;
+    }
+
+    public ModBagBridge getModBagBridge() {
+        return modBagBridge;
     }
 }
