@@ -31,6 +31,10 @@ final class ModBagByteBuf {
         return output.toByteArray();
     }
 
+    boolean canRead() {
+        return input != null && readerIndex < input.length;
+    }
+
     void writeBoolean(boolean value) {
         output.write(value ? 1 : 0);
     }

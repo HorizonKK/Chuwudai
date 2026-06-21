@@ -31,6 +31,8 @@ public class ModBagBridge implements Listener, PluginMessageListener {
     private static final String OPEN_CHANNEL = "xiuxiankeypress:bag_open";
     private static final String UPDATE_CHANNEL = "xiuxiankeypress:bag_update";
     private static final String CLICK_CHANNEL = "xiuxiankeypress:bag_click";
+    private static final String DETAIL_REQUEST_CHANNEL = "xiuxiankeypress:bag_detail_page";
+    private static final String DETAIL_CHANNEL = "xiuxiankeypress:bag_detail";
     private static final String PAGE_CHANNEL = "xiuxiankeypress:bag_page";
     private static final String CLOSE_CHANNEL = "xiuxiankeypress:bag_close";
     private static final int PROTOCOL_VERSION = 1;
@@ -39,8 +41,10 @@ public class ModBagBridge implements Listener, PluginMessageListener {
     private static final int AREA_BAG = 0;
     private static final int AREA_PLAYER = 1;
     private static final int MAX_ID_LENGTH = 64;
-    private static final int MAX_LORE_LINES = 0;
-    private static final int MAX_DISPLAY_TEXT_LENGTH = 16;
+    private static final int MAX_PREVIEW_LORE_LINES = 0;
+    private static final int MAX_DETAIL_LORE_LINES = 64;
+    private static final int MAX_PREVIEW_TEXT_LENGTH = 16;
+    private static final int MAX_DETAIL_TEXT_LENGTH = 128;
     private static final long SESSION_TIMEOUT_MILLIS = 120_000L;
 
     private final Chuwudai plugin;
@@ -55,10 +59,12 @@ public class ModBagBridge implements Listener, PluginMessageListener {
     public void register() {
         plugin.getServer().getMessenger().registerIncomingPluginChannel(plugin, HELLO_CHANNEL, this);
         plugin.getServer().getMessenger().registerIncomingPluginChannel(plugin, CLICK_CHANNEL, this);
+        plugin.getServer().getMessenger().registerIncomingPluginChannel(plugin, DETAIL_REQUEST_CHANNEL, this);
         plugin.getServer().getMessenger().registerIncomingPluginChannel(plugin, PAGE_CHANNEL, this);
         plugin.getServer().getMessenger().registerIncomingPluginChannel(plugin, CLOSE_CHANNEL, this);
         plugin.getServer().getMessenger().registerOutgoingPluginChannel(plugin, OPEN_CHANNEL);
         plugin.getServer().getMessenger().registerOutgoingPluginChannel(plugin, UPDATE_CHANNEL);
+        plugin.getServer().getMessenger().registerOutgoingPluginChannel(plugin, DETAIL_CHANNEL);
         plugin.getServer().getMessenger().registerOutgoingPluginChannel(plugin, CLOSE_CHANNEL);
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
         cleanupTask = Bukkit.getScheduler().runTaskTimer(plugin, this::closeExpiredSessions, 20L * 30L, 20L * 30L);
@@ -138,6 +144,7 @@ public class ModBagBridge implements Listener, PluginMessageListener {
             switch (channel) {
                 case HELLO_CHANNEL -> handleHello(player, message);
                 case CLICK_CHANNEL -> handleClick(player, message);
+                case DETAIL_REQUEST_CHANNEL -> handleDetailPage(player, message);
                 case PAGE_CHANNEL -> handlePage(player, message);
                 case CLOSE_CHANNEL -> handleClose(player, message);
                 default -> {
@@ -170,8 +177,15 @@ public class ModBagBridge implements Listener, PluginMessageListener {
     private void handleHello(Player player, byte[] message) {
         ModBagByteBuf buf = ModBagByteBuf.reader(message);
         int protocol = buf.readVarInt();
-        if (protocol == PROTOCOL_VERSION) {
+        boolean modPagesEnabled = !buf.canRead() || buf.readBoolean();
+        if (protocol == PROTOCOL_VERSION && modPagesEnabled) {
             modPlayers.add(player.getUniqueId());
+        } else {
+            modPlayers.remove(player.getUniqueId());
+            BagSession session = sessions.get(player.getUniqueId());
+            if (session != null && session.mode == BagOpenMode.MOD) {
+                closeExistingSession(player, true);
+            }
         }
     }
 
@@ -193,6 +207,10 @@ public class ModBagBridge implements Listener, PluginMessageListener {
             return;
         }
         if (!isValidSlot(area, slot, bagData)) {
+            sendSnapshot(player, session, bagData, UPDATE_CHANNEL);
+            return;
+        }
+        if (area == AREA_BAG && !isSelectedDetailSlot(session, slot, bagData)) {
             sendSnapshot(player, session, bagData, UPDATE_CHANNEL);
             return;
         }
@@ -225,7 +243,32 @@ public class ModBagBridge implements Listener, PluginMessageListener {
         }
         int maxBigPage = Math.max(0, (bagData.getTotalPages() + VISIBLE_PAGES - 1) / VISIBLE_PAGES - 1);
         session.bigPage = Math.max(0, Math.min(requestedBigPage, maxBigPage));
+        if (!isVisiblePage(session, session.detailPage, bagData)) {
+            session.detailPage = -1;
+        }
         sendSnapshot(player, session, bagData, UPDATE_CHANNEL);
+    }
+
+    private void handleDetailPage(Player player, byte[] message) {
+        ModBagByteBuf buf = ModBagByteBuf.reader(message);
+        String bagId = buf.readString(MAX_ID_LENGTH);
+        int revision = buf.readVarInt();
+        int requestedPage = buf.readVarInt();
+
+        BagSession session = requireModSession(player, bagId);
+        if (session == null) {
+            return;
+        }
+        BagData bagData = getOrCreateBagData(bagId);
+        if (!validateRevision(player, session, bagData, revision)) {
+            return;
+        }
+        if (!isVisiblePage(session, requestedPage, bagData)) {
+            sendSnapshot(player, session, bagData, UPDATE_CHANNEL);
+            return;
+        }
+        session.detailPage = requestedPage;
+        sendDetailPage(player, session, bagData, requestedPage);
     }
 
     private void handleClose(Player player, byte[] message) {
@@ -468,6 +511,23 @@ public class ModBagBridge implements Listener, PluginMessageListener {
         return area == AREA_PLAYER && slot >= 0 && slot < 36;
     }
 
+    private boolean isVisiblePage(BagSession session, int page, BagData bagData) {
+        if (page < 0 || page >= bagData.getTotalPages()) {
+            return false;
+        }
+        int firstVisiblePage = session.bigPage * VISIBLE_PAGES;
+        int lastVisiblePage = Math.min(bagData.getTotalPages(), firstVisiblePage + VISIBLE_PAGES);
+        return page >= firstVisiblePage && page < lastVisiblePage;
+    }
+
+    private boolean isSelectedDetailSlot(BagSession session, int slot, BagData bagData) {
+        if (slot < 0 || slot >= bagData.getSize()) {
+            return false;
+        }
+        int page = slot / BAG_SLOTS_PER_PAGE;
+        return page == session.detailPage && isVisiblePage(session, page, bagData);
+    }
+
     private void sendSnapshot(Player player, BagSession session, BagData bagData, String channel) {
         ModBagByteBuf buf = ModBagByteBuf.writer();
         buf.writeString(session.bagId);
@@ -479,6 +539,29 @@ public class ModBagBridge implements Listener, PluginMessageListener {
         writeBagItems(buf, session, bagData);
         writePlayerItems(buf, player);
         player.sendPluginMessage(plugin, channel, buf.toByteArray());
+    }
+
+    private void sendDetailPage(Player player, BagSession session, BagData bagData, int page) {
+        ModBagByteBuf buf = ModBagByteBuf.writer();
+        buf.writeString(session.bagId);
+        buf.writeVarInt(session.revision);
+        buf.writeVarInt(page);
+
+        int startSlot = page * BAG_SLOTS_PER_PAGE;
+        int endSlot = Math.min(bagData.getSize(), startSlot + BAG_SLOTS_PER_PAGE);
+        List<Integer> slots = new ArrayList<>();
+        for (int slot = startSlot; slot < endSlot; slot++) {
+            if (!isEmpty(bagData.getItem(slot))) {
+                slots.add(slot);
+            }
+        }
+
+        buf.writeVarInt(slots.size());
+        for (int slot : slots) {
+            buf.writeVarInt(slot);
+            writeDetailedItem(buf, bagData.getItem(slot));
+        }
+        player.sendPluginMessage(plugin, DETAIL_CHANNEL, buf.toByteArray());
     }
 
     private void writeBagItems(ModBagByteBuf buf, BagSession session, BagData bagData) {
@@ -514,6 +597,14 @@ public class ModBagBridge implements Listener, PluginMessageListener {
     }
 
     private void writeItem(ModBagByteBuf buf, ItemStack item) {
+        writeItem(buf, item, MAX_PREVIEW_LORE_LINES, MAX_PREVIEW_TEXT_LENGTH);
+    }
+
+    private void writeDetailedItem(ModBagByteBuf buf, ItemStack item) {
+        writeItem(buf, item, MAX_DETAIL_LORE_LINES, MAX_DETAIL_TEXT_LENGTH);
+    }
+
+    private void writeItem(ModBagByteBuf buf, ItemStack item, int maxLoreLines, int maxTextLength) {
         if (isEmpty(item)) {
             buf.writeBoolean(false);
             return;
@@ -524,12 +615,12 @@ public class ModBagBridge implements Listener, PluginMessageListener {
         ItemMeta meta = item.getItemMeta();
         int customModelData = meta != null && meta.hasCustomModelData() ? meta.getCustomModelData() : 0;
         buf.writeVarInt(customModelData);
-        buf.writeString(limitText(meta != null && meta.hasDisplayName() ? meta.getDisplayName() : ""));
+        buf.writeString(limitText(meta != null && meta.hasDisplayName() ? meta.getDisplayName() : "", maxTextLength));
         List<String> lore = meta != null && meta.hasLore() ? meta.getLore() : List.of();
-        int loreCount = Math.min(lore == null ? 0 : lore.size(), MAX_LORE_LINES);
+        int loreCount = Math.min(lore == null ? 0 : lore.size(), maxLoreLines);
         buf.writeVarInt(loreCount);
         for (int i = 0; i < loreCount; i++) {
-            buf.writeString(limitText(lore.get(i)));
+            buf.writeString(limitText(lore.get(i), maxTextLength));
         }
     }
 
@@ -632,11 +723,11 @@ public class ModBagBridge implements Listener, PluginMessageListener {
         return item == null || item.getType() == Material.AIR || item.getAmount() <= 0;
     }
 
-    private String limitText(String value) {
+    private String limitText(String value, int maxLength) {
         if (value == null || value.isEmpty()) {
             return "";
         }
-        return value.length() <= MAX_DISPLAY_TEXT_LENGTH ? value : value.substring(0, MAX_DISPLAY_TEXT_LENGTH);
+        return value.length() <= maxLength ? value : value.substring(0, maxLength);
     }
     private void sendBagOpenedMessage(Player player, String bagId) {
         player.sendMessage(ColorUtils.translateColorCodes(plugin.getConfig().getString("messages.prefix", "&8[&6Storage&8] &f")
@@ -654,6 +745,7 @@ public class ModBagBridge implements Listener, PluginMessageListener {
         private ItemStack cursorItem;
         private int revision;
         private int bigPage;
+        private int detailPage = -1;
         private long lastActionTime = System.currentTimeMillis();
 
         private BagSession(String bagId, BagOpenMode mode) {
