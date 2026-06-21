@@ -142,6 +142,11 @@ public class BagManager {
                 if (bagId.equals(bagInventory.getBagData().getId())) {
                     return true;
                 }
+            } else if (topInventory.getHolder() instanceof BagOptionsInventory) {
+                BagOptionsInventory optionsInventory = (BagOptionsInventory) topInventory.getHolder();
+                if (bagId.equals(optionsInventory.getBagData().getId())) {
+                    return true;
+                }
             }
         }
         return false;

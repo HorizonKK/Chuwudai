@@ -9,6 +9,7 @@ messages:
   pill-not-found: "&c找不到ID为 %id% 的丹瓶！"
   pill-opened: "&a已打开丹瓶 %id%"
   stone-pickup: "&a已自动存入 %amount% 个 %stone%"
+  item-pickup: "&a储物袋已自动吸收 %amount% 个物品。"
   inventory-full: "&c储物袋已满，无法存入更多物品！"
   invalid-stone: "&c这不是有效的灵石！"
   invalid-pill-item: "&c只能存放含有'丹药'或'丹'字样的物品！"

@@ -5,6 +5,7 @@ import com.horizonkk.chuwudai.bag.BagData;
 import com.horizonkk.chuwudai.bag.BagInventory;
 import com.horizonkk.chuwudai.bag.BagItem;
 import com.horizonkk.chuwudai.bag.BagManager;
+import com.horizonkk.chuwudai.bag.BagOptionsInventory;
 import com.horizonkk.chuwudai.utlis.ColorUtils;
 import org.bukkit.Material;
 import org.bukkit.entity.HumanEntity;
@@ -95,8 +96,29 @@ public class BagListener implements Listener {
     // 原有的事件处理（保持不动）
     @EventHandler
     public void onInventoryClickInBag(InventoryClickEvent event) {
+        if (event.getInventory().getHolder() instanceof BagOptionsInventory) {
+            event.setCancelled(true);
+            if (event.getWhoClicked() instanceof Player
+                    && event.getClickedInventory() != null
+                    && event.getClickedInventory().getHolder() instanceof BagOptionsInventory) {
+                BagOptionsInventory optionsInventory = (BagOptionsInventory) event.getInventory().getHolder();
+                if (optionsInventory.isMenuSlot(event.getSlot())) {
+                    optionsInventory.handleClick(event.getSlot(), (Player) event.getWhoClicked());
+                }
+            }
+            return;
+        }
+
         if (event.getInventory().getHolder() instanceof BagInventory) {
             BagInventory bagInventory = (BagInventory) event.getInventory().getHolder();
+            if (event.getClickedInventory() != null
+                    && event.getClickedInventory().getHolder() instanceof BagInventory
+                    && bagInventory.isControlSlot(event.getSlot())) {
+                event.setCancelled(true);
+                bagInventory.handleControlClick(event.getSlot(), event.getClick(), (Player) event.getWhoClicked());
+                return;
+            }
+
             // 根据物品名称判断是否是控制按钮，而不是依赖槽位索引
             ItemStack clickedItem = event.getCurrentItem();
             if (isControlButtonItem(clickedItem)) {
@@ -104,7 +126,7 @@ public class BagListener implements Listener {
                 // 找到对应的控制槽位并处理点击
                 int slot = findControlSlotByItem(bagInventory.getInventory(), clickedItem);
                 if (slot != -1) {
-                    bagInventory.handleControlClick(slot);
+                    bagInventory.handleControlClick(slot, event.getClick(), (Player) event.getWhoClicked());
                 }
                 return;
             }

@@ -88,6 +88,8 @@ auto-pickup:
   # 需要将储物袋放在背包顶部第一格才生效
   require-slot-zero: true
   check-interval: 5 # 检查间隔(ticks)
+  # 储物袋自动吸收非灵石物品时的聊天提示冷却，单位毫秒；设为 -1 可关闭提示
+  message-cooldown-ms: 3000
 
 # 界面设置
 ui:

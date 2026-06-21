@@ -4,6 +4,7 @@ import com.horizonkk.chuwudai.Chuwudai;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
+import org.bukkit.event.inventory.ClickType;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
@@ -12,12 +13,14 @@ import org.bukkit.inventory.meta.ItemMeta;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 public class BagInventory implements InventoryHolder {
 
     private final BagData bagData;
     private Inventory inventory;
     private int currentPage;
+    private UUID viewerId;
     private final Map<Integer, Integer> slotMapping = new HashMap<>();
     // 每页的实际存储格数（不包括控制栏）
     private static final int ITEMS_PER_PAGE = 45;
@@ -25,8 +28,12 @@ public class BagInventory implements InventoryHolder {
     private static final int CONTROL_BAR_START = 45;
 
     public BagInventory(BagData bagData) {
+        this(bagData, 0);
+    }
+
+    public BagInventory(BagData bagData, int currentPage) {
         this.bagData = bagData;
-        this.currentPage = 0;
+        this.currentPage = Math.max(0, Math.min(currentPage, Math.max(0, bagData.getTotalPages() - 1)));
         createInventory();
     }
 
@@ -134,12 +141,8 @@ public class BagInventory implements InventoryHolder {
 
         ItemStack pageInfo = createButton(
                 Material.BOOK,
-                pageTitle, // 已经包含颜色代码
-                Arrays.asList(
-                        com.horizonkk.chuwudai.utlis.ColorUtils.translateColorCodes("&7总容量: &f" + bagData.getSize() + " 格"),
-                        com.horizonkk.chuwudai.utlis.ColorUtils.translateColorCodes("&7当前页存储: &f" + currentPageStorageCount + " 格"),
-                        com.horizonkk.chuwudai.utlis.ColorUtils.translateColorCodes("&7存储物品: &f" + bagData.getUsedSlots() + " 个")
-                )
+                pageTitle,
+                createPageInfoLore(currentPageStorageCount)
         );
         inventory.setItem(controlStart + 4, pageInfo);
 
@@ -165,6 +168,32 @@ public class BagInventory implements InventoryHolder {
         return glass;
     }
 
+    private java.util.List<String> createPageInfoLore(int currentPageStorageCount) {
+        BagAutoPickupSettings.Settings settings = getAutoPickupSettings();
+        return Arrays.asList(
+                com.horizonkk.chuwudai.utlis.ColorUtils.translateColorCodes("&7总容量: &f" + bagData.getSize() + " 格"),
+                com.horizonkk.chuwudai.utlis.ColorUtils.translateColorCodes("&7当前页存储: &f" + currentPageStorageCount + " 格"),
+                com.horizonkk.chuwudai.utlis.ColorUtils.translateColorCodes("&7存储物品: &f" + bagData.getUsedSlots() + " 个"),
+                com.horizonkk.chuwudai.utlis.ColorUtils.translateColorCodes(""),
+                com.horizonkk.chuwudai.utlis.ColorUtils.translateColorCodes("&6自动吸收选项:"),
+                com.horizonkk.chuwudai.utlis.ColorUtils.translateColorCodes(getAutoPickupStatusLine("原版物品", settings.isVanillaItems())),
+                com.horizonkk.chuwudai.utlis.ColorUtils.translateColorCodes(getAutoPickupStatusLine("矿石物品", settings.isOreItems())),
+                com.horizonkk.chuwudai.utlis.ColorUtils.translateColorCodes(getAutoPickupStatusLine("灵石", settings.isSpiritStones())),
+                com.horizonkk.chuwudai.utlis.ColorUtils.translateColorCodes("&8点击打开选项菜单")
+        );
+    }
+
+    private BagAutoPickupSettings.Settings getAutoPickupSettings() {
+        if (viewerId == null) {
+            return BagAutoPickupSettings.get(new UUID(0L, 0L));
+        }
+        return BagAutoPickupSettings.get(viewerId);
+    }
+
+    private String getAutoPickupStatusLine(String name, boolean enabled) {
+        return "  &7" + name + ": " + (enabled ? "&a开启" : "&c关闭");
+    }
+
     private ItemStack createButton(Material material, String name, java.util.List<String> lore) {
         ItemStack item = new ItemStack(material);
         ItemMeta meta = item.getItemMeta();
@@ -185,6 +214,8 @@ public class BagInventory implements InventoryHolder {
     }
 
     public void open(Player player) {
+        this.viewerId = player.getUniqueId();
+        addControlButtons();
         player.openInventory(inventory);
     }
 
@@ -196,13 +227,19 @@ public class BagInventory implements InventoryHolder {
     }
 
     public void handleControlClick(int slot) {
+        handleControlClick(slot, ClickType.LEFT, null);
+    }
+
+    public void handleControlClick(int slot, ClickType click, Player player) {
         int totalPages = bagData.getTotalPages();
         int inventorySize = inventory.getSize();
         int controlStart = inventorySize - 9;
 
         // 检查是否点击了页码信息按钮（中间位置）
         if (slot == controlStart + 4) {
-            // 页码信息按钮不处理任何操作，直接返回
+            if (player != null) {
+                new BagOptionsInventory(bagData, currentPage).open(player);
+            }
             return;
         }
 
