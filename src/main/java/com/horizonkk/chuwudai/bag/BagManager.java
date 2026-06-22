@@ -99,9 +99,6 @@ public class BagManager {
         }
         try {
             BagInventory inventory = new BagInventory(bagData);
-            if (Chuwudai.getInstance().getModBagBridge() != null) {
-                Chuwudai.getInstance().getModBagBridge().beginVanillaSession(player, bagId);
-            }
             inventory.open(player);
             player.sendMessage(ColorUtils.translateColorCodes(Chuwudai.getInstance().getConfig().getString("messages.prefix", "&8[&6储物袋&8] &f") +
                     Chuwudai.getInstance().getConfig().getString("messages.bag-opened", "&a已打开储物袋 %id%")

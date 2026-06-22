@@ -50,7 +50,7 @@ public class BagInventory implements InventoryHolder {
         int inventorySize = (storageRows + 1) * 9;
         // 但要确保不超过Bukkit的最大限制（通常是54格）
 //        inventorySize = Math.min(inventorySize, 54);
-        inventory = Bukkit.createInventory(this, inventorySize, "储物袋 #" + bagData.getId() + " (第 " + (currentPage + 1) + " 页)");
+        inventory = Bukkit.createInventory(this, inventorySize, "储物袋 #" + bagData.getId());
         loadItems();
         addControlButtons();
     }
@@ -217,6 +217,9 @@ public class BagInventory implements InventoryHolder {
         this.viewerId = player.getUniqueId();
         addControlButtons();
         player.openInventory(inventory);
+        if (Chuwudai.getInstance().getModBagBridge() != null) {
+            Chuwudai.getInstance().getModBagBridge().beginVanillaSession(player, bagData.getId());
+        }
     }
 
     public boolean isControlSlot(int slot) {
@@ -256,16 +259,15 @@ public class BagInventory implements InventoryHolder {
     }
 
     public void refresh() {
+        saveItems();
         inventory.clear();
         loadItems();
         addControlButtons();
 
-        // 更新标题显示当前页码
-        String title = "储物袋 #" + bagData.getId() + " (第 " + (currentPage + 1) + " 页)";
-        if (!inventory.getViewers().isEmpty()) {
-            Player viewer = (Player) inventory.getViewers().get(0);
-            viewer.closeInventory();
-            open(viewer);
+        for (org.bukkit.entity.HumanEntity viewer : inventory.getViewers()) {
+            if (viewer instanceof Player) {
+                ((Player) viewer).updateInventory();
+            }
         }
     }
 

@@ -4,6 +4,7 @@ import com.horizonkk.chuwudai.Chuwudai;
 import com.horizonkk.chuwudai.bag.BagData;
 import com.horizonkk.chuwudai.bag.BagItem;
 import com.horizonkk.chuwudai.bag.BagManager;
+import com.horizonkk.chuwudai.hook.NeigeitemsHook;
 import com.horizonkk.chuwudai.pill.PillData;
 import com.horizonkk.chuwudai.pill.PillItem;
 import com.horizonkk.chuwudai.pill.PillManager;
@@ -811,6 +812,68 @@ public class ChuwudaiAPI {
             }
         }
         return remaining;
+    }
+
+    // ==================== NI物品扣除API ====================
+
+    /**
+     * 查询指定槽位储物袋内指定NI物品数量
+     * @param player 玩家
+     * @param bagSlot 储物袋在玩家背包中的槽位（0-35）
+     * @param itemId NI物品ID
+     * @return 指定NI物品数量
+     */
+    public static int countNiItemInBagSlot(Player player, int bagSlot, String itemId) {
+        return NeigeitemsHook.countNiItemInBagSlot(player, bagSlot, itemId);
+    }
+
+    /**
+     * 批量查询指定槽位储物袋内多种NI物品数量
+     * 只扫描一次该储物袋
+     * @param player 玩家
+     * @param bagSlot 储物袋在玩家背包中的槽位（0-35）
+     * @param itemIds NI物品ID集合
+     * @return Map<NI物品ID, 数量>
+     */
+    public static Map<String, Integer> countNiItemsInBagSlot(Player player, int bagSlot, java.util.Collection<String> itemIds) {
+        return NeigeitemsHook.countNiItemsInBagSlot(player, bagSlot, itemIds);
+    }
+
+    /**
+     * 从指定槽位的储物袋中扣除指定NI物品
+     * 仅读取储物袋内ItemStack的NI物品ID，并与传入itemId做字符串比较
+     * @param player 玩家
+     * @param bagSlot 储物袋在玩家背包中的槽位（0-35）
+     * @param itemId NI物品ID
+     * @param amount 要扣除的数量
+     * @return 实际扣除数量
+     */
+    public static int deductNiItemFromBagSlot(Player player, int bagSlot, String itemId, int amount) {
+        return NeigeitemsHook.deductNiItemFromBagSlot(player, bagSlot, itemId, amount);
+    }
+
+    /**
+     * 从指定槽位的储物袋中扣除指定NI物品，并返回结果信息
+     * @param player 玩家
+     * @param bagSlot 储物袋在玩家背包中的槽位（0-35）
+     * @param itemId NI物品ID
+     * @param amount 要扣除的数量
+     * @return 扣除结果
+     */
+    public static NeigeitemsHook.NiItemDeductionResult deductNiItemFromSpecificBag(Player player, int bagSlot, String itemId, int amount) {
+        return NeigeitemsHook.deductNiItemFromSpecificBag(player, bagSlot, itemId, amount);
+    }
+
+    /**
+     * 从玩家背包指定储物袋批量扣除多种NI物品
+     * 只扫描一次该储物袋；每个物品只读取一次NI物品ID
+     * @param player 玩家
+     * @param bagSlot 储物袋在玩家背包中的槽位（0-35）
+     * @param requiredItems 需要扣除的NI物品 Map<NI物品ID, 数量>
+     * @return 批量扣除结果
+     */
+    public static NeigeitemsHook.BatchNiItemDeductionResult deductNiItemsFromSpecificBag(Player player, int bagSlot, Map<String, Integer> requiredItems) {
+        return NeigeitemsHook.deductNiItemsFromSpecificBag(player, bagSlot, requiredItems);
     }
 
     // ==================== 工具方法API ====================

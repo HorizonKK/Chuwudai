@@ -105,5 +105,12 @@
             <scope>system</scope>
             <systemPath>${project.basedir}/libs/hoXiuLian-1.0-SNAPSHOT.jar</systemPath>
         </dependency>
+        <dependency>
+            <groupId>pers.neige.neigeitems.NeigeItems</groupId>
+            <artifactId>NeigeItems</artifactId>
+            <version>1.21.129</version>
+            <scope>system</scope>
+            <systemPath>${project.basedir}/libs/NeigeItems-1.21.129-api.jar</systemPath>
+        </dependency>
     </dependencies>
 </project>

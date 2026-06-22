@@ -9,6 +9,7 @@ depand:
   - PlaceholderAPI
 softdepend:
   - HoXiuLian
+  - NeigeItems
 commands:
   chuwudai:
     description: 储物袋主命令
