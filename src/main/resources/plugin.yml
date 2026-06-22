@@ -14,11 +14,14 @@ commands:
   chuwudai:
     description: 储物袋主命令
     aliases: [cd, bag]
-    usage: /<command> <give|open|tempbox|reload|help>
+    usage: /<command> <give|getbag|open|tempbox|reload|help>
 
 permissions:
   chuwudai.give:
     description: 允许给予储物袋
+    default: op
+  chuwudai.getbag:
+    description: 允许按ID补发已有储物袋
     default: op
   chuwudai.open:
     description: 允许打开储物袋
@@ -40,6 +43,7 @@ permissions:
     default: op
     children:
       chuwudai.give: true
+      chuwudai.getbag: true
       chuwudai.open: true
       chuwudai.tempbox: true
       chuwudai.tempbox.others: true

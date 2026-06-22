@@ -125,6 +125,14 @@ public class BagCommand implements CommandExecutor {
                 bagManager.openBag((Player) sender, bagId);
                 break;
 
+            case "getbag":
+                if (!sender.hasPermission("chuwudai.getbag") && !sender.hasPermission("chuwudai.give")) {
+                    sender.sendMessage(ColorUtils.translateColorCodes(prefix + Chuwudai.getInstance().getConfig().getString("messages.no-permission", "&c你没有权限执行此命令！")));
+                    return true;
+                }
+                handleGetBagCommand(sender, args, prefix);
+                break;
+
             case "tempbox":
                 if (!(sender instanceof Player)) {
                     sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&c只有玩家才能使用此命令！"));
@@ -282,6 +290,60 @@ public class BagCommand implements CommandExecutor {
         return true;
     }
 
+    private void handleGetBagCommand(CommandSender sender, String[] args, String prefix) {
+        Player target;
+        String bagId;
+        String style = BundleStyle.getRandomStyleName();
+
+        if (args.length == 2 && sender instanceof Player) {
+            target = (Player) sender;
+            bagId = args[1];
+        } else if (args.length == 3 && sender instanceof Player && Bukkit.getPlayer(args[1]) == null) {
+            target = (Player) sender;
+            bagId = args[1];
+            style = args[2].toLowerCase();
+        } else if (args.length >= 3) {
+            target = Bukkit.getPlayer(args[1]);
+            if (target == null) {
+                sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&c玩家 &e" + args[1] + " &c不在线！"));
+                return;
+            }
+            bagId = args[2];
+            if (args.length >= 4) {
+                style = args[3].toLowerCase();
+            }
+        } else {
+            sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&c用法: &e/chuwudai getbag <储物袋ID> [样式]"));
+            sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&c用法: &e/chuwudai getbag <玩家名> <储物袋ID> [样式]"));
+            return;
+        }
+
+        if (!isValidStyle(style)) {
+            sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&c无效的样式！&7可用样式: &fblue&7, &fbrown&7, &fcyan&7, &fgray&7, &fgreen&7, &flight_blue&7, &flight_gray&7, &flime&7, &fmagenta&7, &forange&7, &fpink&7, &fpurple&7, &fred&7, &fwhite&7, &fyellow"));
+            return;
+        }
+
+        com.horizonkk.chuwudai.bag.BagData bagData = bagManager.getBagData(bagId);
+        if (bagData == null) {
+            sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&c找不到ID为 &e" + bagId + " &c的储物袋数据！"));
+            return;
+        }
+
+        ItemStack bagItem = com.horizonkk.chuwudai.bag.BagItem.createBag(bagData.getSize(), bagId, style);
+        com.horizonkk.chuwudai.bag.BagItem.updateBagLore(bagItem, bagData.getStoneCounts(), bagData);
+
+        Map<Integer, ItemStack> leftover = target.getInventory().addItem(bagItem);
+        if (!leftover.isEmpty()) {
+            target.getWorld().dropItem(target.getLocation(), bagItem);
+        }
+
+        String styleName = getStyleChineseName(style);
+        sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&a已给予玩家 &e" + target.getName() + " &a储物袋 &f" + bagId + " &7(" + bagData.getSize() + "格, " + styleName + "样式)"));
+        if (!sender.equals(target)) {
+            target.sendMessage(ColorUtils.translateColorCodes(prefix + "&a你获得了储物袋 &f" + bagId + " &7(" + bagData.getSize() + "格, " + styleName + "样式)"));
+        }
+    }
+
     private boolean isValidStoneType(String stoneType) {
         return stoneType.equals("下品灵石") ||
                 stoneType.equals("中品灵石") ||
@@ -417,6 +479,10 @@ public class BagCommand implements CommandExecutor {
             sender.sendMessage(ColorUtils.translateColorCodes("&7样式可选: &fblue&7, &fbrown&7, &fcyan&7, &fgray&7, &fgreen&7, &flight_blue&7, &flight_gray&7, &flime&7, &fmagenta&7, &forange&7, &fpink&7, &fpurple&7, &fred&7, &fwhite&7, &fyellow"));
             sender.sendMessage(ColorUtils.translateColorCodes("&7默认: &f不指定样式时随机选择颜色"));
             sender.sendMessage(ColorUtils.translateColorCodes("&7UI说明: 左侧←上一页 | 中间📖信息 | 右侧→下一页"));
+        }
+        if (sender.hasPermission("chuwudai.getbag") || sender.hasPermission("chuwudai.give")) {
+            sender.sendMessage(ColorUtils.translateColorCodes("&e/chuwudai getbag <玩家> <ID> [样式] &7- 按ID补发已有储物袋"));
+            sender.sendMessage(ColorUtils.translateColorCodes("&7玩家自用: &f/chuwudai getbag <ID> [样式]"));
         }
         if (sender.hasPermission("chuwudai.open")) {
             sender.sendMessage(ColorUtils.translateColorCodes("&e/chuwudai open <ID> &7- 打开指定ID的储物袋"));
