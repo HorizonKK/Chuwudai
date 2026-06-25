@@ -76,6 +76,9 @@ public final class Chuwudai extends JavaPlugin {
         if (modBagBridge != null) {
             modBagBridge.closeAll();
         }
+        if (bagManager != null) {
+            bagManager.flushAllDirtyBags();
+        }
         // 保存所有数据
         dataManager.saveAllBags();
         pillDataManager.saveAllPills();

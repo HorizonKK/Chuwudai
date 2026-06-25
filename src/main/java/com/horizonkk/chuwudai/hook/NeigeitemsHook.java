@@ -161,14 +161,7 @@ public class NeigeitemsHook {
         BagData bagData = getBagManager().getBagData(bagId);
         if (bagData == null) return 0;
 
-        int count = 0;
-        for (ItemStack item : bagData.getAllItems().values()) {
-            String currentItemId = getSafeItemId(item);
-            if (itemId.equals(currentItemId)) {
-                count += item.getAmount();
-            }
-        }
-        return count;
+        return bagData.getNiItemCount(itemId);
     }
 
     /**
@@ -201,11 +194,8 @@ public class NeigeitemsHook {
         BagData bagData = getBagManager().getBagData(bagId);
         if (bagData == null) return counts;
 
-        for (ItemStack item : bagData.getAllItems().values()) {
-            String currentItemId = getSafeItemId(item);
-            if (currentItemId != null && targets.contains(currentItemId)) {
-                counts.merge(currentItemId, item.getAmount(), Integer::sum);
-            }
+        for (String target : targets) {
+            counts.put(target, bagData.getNiItemCount(target));
         }
         return counts;
     }
@@ -339,7 +329,6 @@ public class NeigeitemsHook {
     private static Map<String, Integer> deductNiItemsFromBag(Player player, int bagSlot, Map<String, Integer> needed, BagData bagData, Map<String, Long> timings) {
         Map<String, Integer> remaining = new HashMap<>(needed);
         Map<String, Integer> deducted = new HashMap<>();
-        Map<String, Integer> stoneDeductions = new HashMap<>();
         java.util.List<DeductionPlanEntry> plan = new java.util.ArrayList<>();
 
         PlayerInventory inventory = player.getInventory();
@@ -348,6 +337,15 @@ public class NeigeitemsHook {
 
         String bagId = BagItem.getBagId(bagItem);
         int remainingCount = remaining.values().stream().mapToInt(Integer::intValue).sum();
+
+        long tPrecheck = System.nanoTime();
+        for (Map.Entry<String, Integer> entry : needed.entrySet()) {
+            if (bagData.getNiItemCount(entry.getKey()) < entry.getValue()) {
+                if (timings != null) timings.put("precheck", System.nanoTime() - tPrecheck);
+                return new HashMap<>();
+            }
+        }
+        if (timings != null) timings.put("precheck", System.nanoTime() - tPrecheck);
 
         long tScan = System.nanoTime();
         for (Map.Entry<Integer, ItemStack> entry : bagData.getAllItems().entrySet()) {
@@ -364,7 +362,7 @@ public class NeigeitemsHook {
             int toDeduct = Math.min(item.getAmount(), need);
             if (toDeduct <= 0) continue;
 
-            plan.add(new DeductionPlanEntry(slot, item, toDeduct, getStandardStoneType(item)));
+            plan.add(new DeductionPlanEntry(slot, item, toDeduct));
             deducted.merge(currentItemId, toDeduct, Integer::sum);
 
             int left = need - toDeduct;
@@ -388,25 +386,16 @@ public class NeigeitemsHook {
                 ItemStack item = entry.item.clone();
                 if (item.getAmount() > entry.amount) {
                     item.setAmount(item.getAmount() - entry.amount);
-                    bagData.setItemSilent(entry.slot, item);
+                    bagData.setItem(entry.slot, item);
                 } else {
-                    bagData.removeItemSilent(entry.slot);
-                }
-
-                if (entry.stoneType != null) {
-                    stoneDeductions.merge(entry.stoneType, entry.amount, Integer::sum);
+                    bagData.removeItem(entry.slot);
                 }
             }
             if (timings != null) timings.put("apply", System.nanoTime() - tApply);
 
-            for (Map.Entry<String, Integer> entry : stoneDeductions.entrySet()) {
-                bagData.decrementStoneCount(entry.getKey(), entry.getValue());
-            }
-
             long tSave = System.nanoTime();
             final String saveBagId = bagId;
-            Chuwudai.getInstance().getServer().getScheduler().runTaskAsynchronously(
-                    Chuwudai.getInstance(), () -> getBagManager().saveBagData(saveBagId));
+            getBagManager().queueBagSave(saveBagId);
             if (timings != null) timings.put("save", System.nanoTime() - tSave);
 
             long tLore = System.nanoTime();
@@ -422,13 +411,11 @@ public class NeigeitemsHook {
         private final int slot;
         private final ItemStack item;
         private final int amount;
-        private final String stoneType;
 
-        private DeductionPlanEntry(int slot, ItemStack item, int amount, String stoneType) {
+        private DeductionPlanEntry(int slot, ItemStack item, int amount) {
             this.slot = slot;
             this.item = item.clone();
             this.amount = amount;
-            this.stoneType = stoneType;
         }
     }
 
@@ -463,24 +450,6 @@ public class NeigeitemsHook {
             }
         }
         return remaining;
-    }
-
-    private static String getStandardStoneType(ItemStack item) {
-        if (item == null || !item.hasItemMeta() || !item.getItemMeta().hasDisplayName()) {
-            return null;
-        }
-
-        String displayName = item.getItemMeta().getDisplayName();
-        if (displayName.contains("下品灵石")) {
-            return "&f下品灵石";
-        } else if (displayName.contains("中品灵石")) {
-            return "&a中品灵石";
-        } else if (displayName.contains("上品灵石")) {
-            return "&e上品灵石";
-        } else if (displayName.contains("极品灵石")) {
-            return "&c极品灵石";
-        }
-        return null;
     }
 
     /**

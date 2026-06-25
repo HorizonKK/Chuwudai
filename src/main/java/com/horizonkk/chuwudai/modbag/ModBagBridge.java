@@ -220,7 +220,7 @@ public class ModBagBridge implements Listener, PluginMessageListener {
                 : handleNormalClick(player, session, bagData, area, slot, button);
         if (changed) {
             session.revision++;
-            plugin.getDataManager().saveBag(bagData);
+            plugin.getBagManager().queueBagSave(bagData.getId());
             updateBagLore(player, bagData);
             player.updateInventory();
         }
@@ -637,7 +637,7 @@ public class ModBagBridge implements Listener, PluginMessageListener {
         if (session.mode == BagOpenMode.MOD) {
             returnCursorItem(player, session);
             BagData bagData = getOrCreateBagData(session.bagId);
-            plugin.getDataManager().saveBag(bagData);
+            plugin.getBagManager().flushDirtyBagData(bagData.getId());
             updateBagLore(player, bagData);
             if (notifyClient) {
                 ModBagByteBuf buf = ModBagByteBuf.writer();

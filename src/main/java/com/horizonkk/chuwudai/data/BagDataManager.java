@@ -150,14 +150,22 @@ public class BagDataManager {
     }
 
     public void saveBag(BagData bagData) {
+        saveBag(bagData, true);
+    }
+
+    public void saveBagSnapshot(BagData bagData) {
+        saveBag(bagData, false);
+    }
+
+    private void saveBag(BagData bagData, boolean updateCache) {
         if ("sqlite".equalsIgnoreCase(storageType)) {
-            saveBagToSQLite(bagData);
+            saveBagToSQLite(bagData, updateCache);
         } else {
             saveBagToYAML(bagData);
         }
     }
 
-    private void saveBagToSQLite(BagData bagData) {
+    private void saveBagToSQLite(BagData bagData, boolean updateCache) {
         String sql = """
             INSERT OR REPLACE INTO bags (id, size, data, last_modified)
             VALUES (?, ?, ?, CURRENT_TIMESTAMP)
@@ -174,7 +182,9 @@ public class BagDataManager {
             stmt.executeUpdate();
 
             // 更新内存中的缓存
-            loadedBags.put(bagData.getId(), bagData);
+            if (updateCache) {
+                loadedBags.put(bagData.getId(), bagData);
+            }
         } catch (SQLException e) {
             Chuwudai.getInstance().getLogger().severe("保存储物袋数据到SQLite时出错: " + e.getMessage());
         }

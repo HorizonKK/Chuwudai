@@ -1,7 +1,8 @@
 package com.horizonkk.chuwudai.bag;
 
 import com.horizonkk.chuwudai.Chuwudai;
-import org.bukkit.configuration.ConfigurationSection;
+import com.horizonkk.chuwudai.hook.NeigeitemsHook;
+import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.HashMap;
@@ -13,12 +14,14 @@ public class BagData {
     private int size;
     private final Map<Integer, ItemStack> items;
     private final Map<String, Integer> stoneCounts;
+    private final Map<String, Integer> niItemCounts;
     
     public BagData(String id, int size) {
         this.id = id;
         this.size = size;
         this.items = new HashMap<>();
         this.stoneCounts = new HashMap<>();
+        this.niItemCounts = new HashMap<>();
         initializeStoneCounts();
     }
     
@@ -31,26 +34,44 @@ public class BagData {
     
     // 获取物品
     public ItemStack getItem(int slot) {
-        return items.get(slot);
+        ItemStack item = items.get(slot);
+        return item == null ? null : item.clone();
     }
     
     // 设置物品
     public void setItem(int slot, ItemStack item) {
-        items.put(slot, item);
-        updateStoneCounts();
+        ItemStack normalized = normalizeItem(item);
+        ItemStack oldItem = items.get(slot);
+
+        if (areSameStack(oldItem, normalized)) {
+            return;
+        }
+
+        adjustCachedCounts(oldItem, -1);
+        if (normalized == null) {
+            items.remove(slot);
+        } else {
+            items.put(slot, normalized.clone());
+            adjustCachedCounts(normalized, 1);
+        }
     }
 
     /**
      * 设置物品但不触发灵石计数更新（批量操作时使用，完后手动调 updateStoneCounts）
      */
     public void setItemSilent(int slot, ItemStack item) {
-        items.put(slot, item);
+        ItemStack normalized = normalizeItem(item);
+        if (normalized == null) {
+            items.remove(slot);
+        } else {
+            items.put(slot, normalized.clone());
+        }
     }
 
     // 移除物品
     public void removeItem(int slot) {
-        items.remove(slot);
-        updateStoneCounts();
+        ItemStack oldItem = items.remove(slot);
+        adjustCachedCounts(oldItem, -1);
     }
 
     /**
@@ -64,25 +85,74 @@ public class BagData {
      * 扣除指定类型的灵石计数（批量扣除时直接维护，O(1) 避免全量扫描）
      */
     public void decrementStoneCount(String stoneType, int amount) {
-        stoneCounts.merge(stoneType, -amount, Integer::sum);
+        adjustCount(stoneCounts, stoneType, -amount);
+    }
+
+    public void incrementNiItemCount(String itemId, int amount) {
+        adjustCount(niItemCounts, itemId, amount);
+    }
+
+    public void decrementNiItemCount(String itemId, int amount) {
+        adjustCount(niItemCounts, itemId, -amount);
     }
 
     // 更新灵石计数
     public void updateStoneCounts() {
-        // 重置计数
+        updateCachedCounts();
+    }
+
+    public void updateCachedCounts() {
         for (String key : stoneCounts.keySet()) {
             stoneCounts.put(key, 0);
         }
-        
-        // 重新计算
+        niItemCounts.clear();
+
         for (ItemStack item : items.values()) {
             if (item != null) {
                 String stoneType = identifyStone(item);
                 if (stoneType != null) {
-                    int current = stoneCounts.getOrDefault(stoneType, 0);
-                    stoneCounts.put(stoneType, current + item.getAmount());
+                    adjustCount(stoneCounts, stoneType, item.getAmount());
+                }
+
+                String niItemId = identifyNiItem(item);
+                if (niItemId != null) {
+                    adjustCount(niItemCounts, niItemId, item.getAmount());
                 }
             }
+        }
+    }
+
+    private void adjustCachedCounts(ItemStack item, int direction) {
+        if (item == null) {
+            return;
+        }
+
+        int amountDelta = item.getAmount() * direction;
+        String stoneType = identifyStone(item);
+        if (stoneType != null) {
+            adjustCount(stoneCounts, stoneType, amountDelta);
+        }
+
+        String niItemId = identifyNiItem(item);
+        if (niItemId != null) {
+            adjustCount(niItemCounts, niItemId, amountDelta);
+        }
+    }
+
+    private void adjustCount(Map<String, Integer> counts, String key, int delta) {
+        if (key == null || delta == 0) {
+            return;
+        }
+
+        int value = counts.getOrDefault(key, 0) + delta;
+        if (value <= 0) {
+            if (stoneCounts == counts && counts.containsKey(key)) {
+                counts.put(key, 0);
+            } else {
+                counts.remove(key);
+            }
+        } else {
+            counts.put(key, value);
         }
     }
     
@@ -101,6 +171,27 @@ public class BagData {
             }
         }
         return null;
+    }
+
+    private String identifyNiItem(ItemStack item) {
+        return NeigeitemsHook.getSafeItemId(item);
+    }
+
+    private ItemStack normalizeItem(ItemStack item) {
+        if (item == null || item.getType() == Material.AIR || item.getAmount() <= 0) {
+            return null;
+        }
+        return item;
+    }
+
+    private boolean areSameStack(ItemStack first, ItemStack second) {
+        if (first == null && second == null) {
+            return true;
+        }
+        if (first == null || second == null) {
+            return false;
+        }
+        return first.equals(second);
     }
 
     private String standardizeStoneName(String displayName) {
@@ -175,6 +266,14 @@ public class BagData {
     public Map<String, Integer> getStoneCounts() {
         return new HashMap<>(stoneCounts);
     }
+
+    public int getNiItemCount(String itemId) {
+        return niItemCounts.getOrDefault(itemId, 0);
+    }
+
+    public Map<String, Integer> getNiItemCounts() {
+        return new HashMap<>(niItemCounts);
+    }
     
     public String getId() { return id; }
     public int getSize() { return size; }
@@ -198,12 +297,32 @@ public class BagData {
     }
 
     public Map<Integer, ItemStack> getAllItems() {
-        return new HashMap<>(items);
+        Map<Integer, ItemStack> copy = new HashMap<>();
+        for (Map.Entry<Integer, ItemStack> entry : items.entrySet()) {
+            ItemStack item = entry.getValue();
+            if (item != null) {
+                copy.put(entry.getKey(), item.clone());
+            }
+        }
+        return copy;
     }
 
     public void setAllItems(Map<Integer, ItemStack> newItems) {
         this.items.clear();
-        this.items.putAll(newItems);
-        updateStoneCounts();
+        if (newItems != null) {
+            for (Map.Entry<Integer, ItemStack> entry : newItems.entrySet()) {
+                setItemSilent(entry.getKey(), entry.getValue());
+            }
+        }
+        updateCachedCounts();
+    }
+
+    public BagData createSaveSnapshot() {
+        BagData snapshot = new BagData(id, size);
+        for (Map.Entry<Integer, ItemStack> entry : items.entrySet()) {
+            snapshot.setItemSilent(entry.getKey(), entry.getValue());
+        }
+        snapshot.updateCachedCounts();
+        return snapshot;
     }
 }

@@ -272,19 +272,44 @@ public class BagInventory implements InventoryHolder {
     }
 
     public void saveItems() {
+        boolean changed = false;
         for (int invSlot : slotMapping.keySet()) {
             int dataSlot = slotMapping.get(invSlot);
-            ItemStack item = inventory.getItem(invSlot);
+            ItemStack item = normalizeStoredItem(inventory.getItem(invSlot));
+            ItemStack current = bagData.getItem(dataSlot);
 
-            if (item != null && !isControlItem(item)) {
+            if (areSameStack(current, item)) {
+                continue;
+            }
+
+            if (item != null) {
                 bagData.setItem(dataSlot, item);
-            } else if (item == null) {
+            } else {
                 bagData.removeItem(dataSlot);
             }
+            changed = true;
         }
 
-        // 保存数据
-        Chuwudai.getInstance().getBagManager().saveBagData(bagData.getId());
+        if (changed) {
+            Chuwudai.getInstance().getBagManager().queueBagSave(bagData.getId());
+        }
+    }
+
+    private ItemStack normalizeStoredItem(ItemStack item) {
+        if (item == null || item.getType() == Material.AIR || isControlItem(item)) {
+            return null;
+        }
+        return item;
+    }
+
+    private boolean areSameStack(ItemStack first, ItemStack second) {
+        if (first == null && second == null) {
+            return true;
+        }
+        if (first == null || second == null) {
+            return false;
+        }
+        return first.equals(second);
     }
 
     private boolean isControlItem(ItemStack item) {

@@ -81,12 +81,7 @@ public class StonePickupListener implements Listener {
             BagItem.updateBagLore(currentBagItem, bagData.getStoneCounts(), bagData);
         }
 
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                Chuwudai.getInstance().getBagManager().saveBagData(bagId);
-            }
-        }.runTaskAsynchronously(Chuwudai.getInstance());
+        Chuwudai.getInstance().getBagManager().queueBagSave(bagId);
 
         if (match.shouldNotify()) {
             sendThrottledStorageNotice(player, storedAmount);

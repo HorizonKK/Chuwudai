@@ -139,15 +139,6 @@ public class BagListener implements Listener {
                 }
                 return;
             }
-            // 更新储物袋物品的Lore（必须在主线程操作物品Meta）
-            ItemStack bagItem = findBagItem(event.getWhoClicked(), bagInventory.getBagData().getId());
-            if (bagItem != null) {
-                BagItem.updateBagLore(bagItem, bagInventory.getBagData().getStoneCounts());
-            }
-            // 异步保存数据
-            Chuwudai.getInstance().getServer().getScheduler().runTaskAsynchronously(Chuwudai.getInstance(), () -> {
-                bagInventory.saveItems();
-            });
         }
     }
 
@@ -191,6 +182,7 @@ public class BagListener implements Listener {
                     (BagInventory) event.getInventory().getHolder();
             // 保存数据
             bagInventory.saveItems();
+            bagManager.flushDirtyBagData(bagInventory.getBagData().getId());
             // 更新背包中的储物袋Lore
             ItemStack bagItem = findBagItem(event.getPlayer(), bagInventory.getBagData().getId());
             if (bagItem != null) {
@@ -199,10 +191,6 @@ public class BagListener implements Listener {
                 Map<String, Integer> stoneCounts = bagData.getStoneCounts();
                 // 更新Lore
                 BagItem.updateBagLore(bagItem, stoneCounts);
-                // 调试信息
-                Chuwudai.getInstance().getLogger().info("更新储物袋 " + bagData.getId() + " 的Lore");
-                Chuwudai.getInstance().getLogger().info("已用槽位: " + bagData.getUsedSlots() + "/" + bagData.getSize());
-                Chuwudai.getInstance().getLogger().info("容量百分比: " + bagData.getCapacityPercentage() + "%");
             }
         }
     }

@@ -12,12 +12,18 @@ import org.bukkit.inventory.ItemStack;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.WeakHashMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class BagManager {
 
     private final Random random = new Random();
     private final Map<String, BagData> bagCache = new WeakHashMap<>();
+    private final Set<String> dirtyBags = ConcurrentHashMap.newKeySet();
+    private final Set<String> savingBags = ConcurrentHashMap.newKeySet();
+    private final Map<String, Integer> pendingSaveTasks = new ConcurrentHashMap<>();
+    private static final long SAVE_DEBOUNCE_TICKS = 60L;
 
     // 生成8位随机ID
     public String generateBagId() {
@@ -187,7 +193,100 @@ public class BagManager {
 
     public void saveBagData(String bagId) {
         if (bagCache.containsKey(bagId)) {
+            Integer taskId = pendingSaveTasks.remove(bagId);
+            if (taskId != null) {
+                Chuwudai.getInstance().getServer().getScheduler().cancelTask(taskId);
+            }
+            if (savingBags.contains(bagId)) {
+                dirtyBags.add(bagId);
+                return;
+            }
             Chuwudai.getInstance().getDataManager().saveBag(bagCache.get(bagId));
+            dirtyBags.remove(bagId);
+        }
+    }
+
+    public void queueBagSave(String bagId) {
+        if (bagId == null || !bagCache.containsKey(bagId)) {
+            return;
+        }
+
+        dirtyBags.add(bagId);
+        pendingSaveTasks.computeIfAbsent(bagId, id ->
+                Chuwudai.getInstance().getServer().getScheduler().runTaskLater(
+                        Chuwudai.getInstance(),
+                        () -> {
+                            pendingSaveTasks.remove(id);
+                            saveDirtyBagData(id);
+                        },
+                        SAVE_DEBOUNCE_TICKS
+                ).getTaskId());
+    }
+
+    public void saveDirtyBagData(String bagId) {
+        if (bagId == null || !dirtyBags.contains(bagId)) {
+            return;
+        }
+
+        if (!savingBags.add(bagId)) {
+            return;
+        }
+
+        if (!dirtyBags.remove(bagId)) {
+            savingBags.remove(bagId);
+            return;
+        }
+
+        BagData bagData = bagCache.get(bagId);
+        if (bagData == null) {
+            savingBags.remove(bagId);
+            return;
+        }
+
+        final String saveBagId = bagId;
+        BagData snapshot = bagData.createSaveSnapshot();
+        Chuwudai.getInstance().getServer().getScheduler().runTaskAsynchronously(
+                Chuwudai.getInstance(),
+                () -> {
+                    try {
+                        Chuwudai.getInstance().getDataManager().saveBagSnapshot(snapshot);
+                    } finally {
+                        Chuwudai.getInstance().getServer().getScheduler().runTask(
+                                Chuwudai.getInstance(),
+                                () -> {
+                                    savingBags.remove(saveBagId);
+                                    if (dirtyBags.contains(saveBagId)) {
+                                        saveDirtyBagData(saveBagId);
+                                    }
+                                });
+                    }
+                });
+    }
+
+    public void flushDirtyBagData(String bagId) {
+        if (bagId == null) {
+            return;
+        }
+
+        Integer taskId = pendingSaveTasks.remove(bagId);
+        if (taskId != null) {
+            Chuwudai.getInstance().getServer().getScheduler().cancelTask(taskId);
+        }
+
+        BagData bagData = bagCache.get(bagId);
+        if (bagData != null && savingBags.contains(bagId)) {
+            dirtyBags.add(bagId);
+            return;
+        }
+
+        if (bagData != null && dirtyBags.remove(bagId)) {
+            Chuwudai.getInstance().getDataManager().saveBagSnapshot(bagData.createSaveSnapshot());
+        }
+    }
+
+    public void flushAllDirtyBags() {
+        for (String bagId : new java.util.HashSet<>(dirtyBags)) {
+            flushDirtyBagData(bagId);
         }
     }
 }

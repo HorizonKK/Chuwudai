@@ -479,9 +479,9 @@ public class ChuwudaiAPI {
                 if (toDeduct > 0) {
                     if (item.getAmount() > toDeduct) {
                         item.setAmount(item.getAmount() - toDeduct);
-                        bagData.setItemSilent(slot, item);
+                        bagData.setItem(slot, item);
                     } else {
-                        bagData.removeItemSilent(slot);
+                        bagData.removeItem(slot);
                     }
                     deducted += toDeduct;
                 }
@@ -490,13 +490,10 @@ public class ChuwudaiAPI {
         if (timings != null) timings.put("scan", System.nanoTime() - tScan);
 
         if (deducted > 0) {
-            bagData.decrementStoneCount(stoneType, deducted);
-
             // 阶段4: 数据保存（异步写盘，内存状态已就绪）
             long tSave = System.nanoTime();
             final String saveBagId = bagId;
-            Chuwudai.getInstance().getServer().getScheduler().runTaskAsynchronously(
-                Chuwudai.getInstance(), () -> bagManager.saveBagData(saveBagId));
+            bagManager.queueBagSave(saveBagId);
             if (timings != null) timings.put("save", System.nanoTime() - tSave);
 
             // 阶段5: Lore更新
@@ -756,9 +753,9 @@ public class ChuwudaiAPI {
                     int toDeduct = Math.min(item.getAmount(), need);
                     if (item.getAmount() > toDeduct) {
                         item.setAmount(item.getAmount() - toDeduct);
-                        bagData.setItemSilent(slot, item);
+                        bagData.setItem(slot, item);
                     } else {
-                        bagData.removeItemSilent(slot);
+                        bagData.removeItem(slot);
                     }
                     if (toDeduct == need) {
                         iter.remove();
@@ -781,15 +778,10 @@ public class ChuwudaiAPI {
 
         int totalDeducted = deducted.values().stream().mapToInt(Integer::intValue).sum();
         if (totalDeducted > 0) {
-            for (Map.Entry<String, Integer> entry : deducted.entrySet()) {
-                bagData.decrementStoneCount(entry.getKey(), entry.getValue());
-            }
-
             // 阶段4: 数据保存（异步写盘，内存状态已就绪）
             long tSave = System.nanoTime();
             final String saveBagId = bagId;
-            Chuwudai.getInstance().getServer().getScheduler().runTaskAsynchronously(
-                Chuwudai.getInstance(), () -> bagManager.saveBagData(saveBagId));
+            bagManager.queueBagSave(saveBagId);
             if (timings != null) timings.put("save", System.nanoTime() - tSave);
 
             // 阶段5: Lore更新
