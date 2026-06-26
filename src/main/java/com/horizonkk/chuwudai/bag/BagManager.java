@@ -23,7 +23,10 @@ public class BagManager {
     private final Set<String> dirtyBags = ConcurrentHashMap.newKeySet();
     private final Set<String> savingBags = ConcurrentHashMap.newKeySet();
     private final Map<String, Integer> pendingSaveTasks = new ConcurrentHashMap<>();
+    private final Map<String, Integer> pendingSizeSaveTasks = new ConcurrentHashMap<>();
+    private final Map<String, Integer> pendingBagSizes = new ConcurrentHashMap<>();
     private static final long SAVE_DEBOUNCE_TICKS = 60L;
+    private static final int DEFAULT_MAX_BAG_SIZE = 540;
 
     // 生成8位随机ID
     public String generateBagId() {
@@ -183,12 +186,21 @@ public class BagManager {
             return null;
         }
 
-        bagData.addSize(additionalSlots);
+        int targetSize = bagData.getSize() + additionalSlots;
+        if (targetSize > getMaxBagSize()) {
+            return null;
+        }
+
+        bagData.setSize(targetSize);
         BagItem.setBagSize(bagItem, bagData.getSize());
         BagItem.updateBagLore(bagItem, bagData.getStoneCounts(), bagData);
-        Chuwudai.getInstance().getDataManager().saveBag(bagData);
+        queueBagSizeSave(bagId, bagData.getSize());
         bagCache.put(bagId, bagData);
         return bagData;
+    }
+
+    public int getMaxBagSize() {
+        return Math.max(9, Chuwudai.getInstance().getConfig().getInt("bag.max-size", DEFAULT_MAX_BAG_SIZE));
     }
 
     public void saveBagData(String bagId) {
@@ -221,6 +233,47 @@ public class BagManager {
                         },
                         SAVE_DEBOUNCE_TICKS
                 ).getTaskId());
+    }
+
+    public void queueBagSizeSave(String bagId, int size) {
+        if (bagId == null) {
+            return;
+        }
+
+        pendingBagSizes.put(bagId, size);
+
+        Integer oldTaskId = pendingSizeSaveTasks.remove(bagId);
+        if (oldTaskId != null) {
+            Chuwudai.getInstance().getServer().getScheduler().cancelTask(oldTaskId);
+        }
+
+        int taskId = Chuwudai.getInstance().getServer().getScheduler().runTaskLater(
+                Chuwudai.getInstance(),
+                () -> {
+                    pendingSizeSaveTasks.remove(bagId);
+                    Integer latestSize = pendingBagSizes.remove(bagId);
+                    if (latestSize != null) {
+                        if (savingBags.contains(bagId)) {
+                            queueBagSizeSave(bagId, latestSize);
+                        } else {
+                            saveBagSizeAsync(bagId, latestSize);
+                        }
+                    }
+                },
+                getSizeSaveDebounceTicks()
+        ).getTaskId();
+        pendingSizeSaveTasks.put(bagId, taskId);
+    }
+
+    private void saveBagSizeAsync(String bagId, int size) {
+        Chuwudai.getInstance().getServer().getScheduler().runTaskAsynchronously(
+                Chuwudai.getInstance(),
+                () -> Chuwudai.getInstance().getDataManager().saveBagSize(bagId, size)
+        );
+    }
+
+    private long getSizeSaveDebounceTicks() {
+        return Math.max(1L, Chuwudai.getInstance().getConfig().getLong("bag.size-save-debounce-ticks", SAVE_DEBOUNCE_TICKS));
     }
 
     public void saveDirtyBagData(String bagId) {
@@ -284,9 +337,28 @@ public class BagManager {
         }
     }
 
+    public void flushPendingBagSizeSave(String bagId) {
+        if (bagId == null) {
+            return;
+        }
+
+        Integer taskId = pendingSizeSaveTasks.remove(bagId);
+        if (taskId != null) {
+            Chuwudai.getInstance().getServer().getScheduler().cancelTask(taskId);
+        }
+
+        Integer size = pendingBagSizes.remove(bagId);
+        if (size != null) {
+            Chuwudai.getInstance().getDataManager().saveBagSize(bagId, size);
+        }
+    }
+
     public void flushAllDirtyBags() {
         for (String bagId : new java.util.HashSet<>(dirtyBags)) {
             flushDirtyBagData(bagId);
+        }
+        for (String bagId : new java.util.HashSet<>(pendingBagSizes.keySet())) {
+            flushPendingBagSizeSave(bagId);
         }
     }
 }

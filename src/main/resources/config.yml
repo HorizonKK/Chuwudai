@@ -7,6 +7,10 @@ storage:
   yaml:
     folder: "bags"   # YAML文件存储文件夹
 
+bag:
+  max-size: 540
+  size-save-debounce-ticks: 60
+
 # 储物袋类型配置
 bag-types:
   27:

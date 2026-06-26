@@ -8,9 +8,12 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.inventory.ItemStack;
 
 import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.sql.*;
 import java.util.Base64;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.zip.Deflater;
 import java.util.zip.Inflater;
@@ -157,6 +160,14 @@ public class BagDataManager {
         saveBag(bagData, false);
     }
 
+    public void saveBagSize(String bagId, int size) {
+        if ("sqlite".equalsIgnoreCase(storageType)) {
+            saveBagSizeToSQLite(bagId, size);
+        } else {
+            saveBagSizeToYAML(bagId, size);
+        }
+    }
+
     private void saveBag(BagData bagData, boolean updateCache) {
         if ("sqlite".equalsIgnoreCase(storageType)) {
             saveBagToSQLite(bagData, updateCache);
@@ -190,6 +201,20 @@ public class BagDataManager {
         }
     }
 
+    private void saveBagSizeToSQLite(String bagId, int size) {
+        String sql = "UPDATE bags SET size = ?, last_modified = CURRENT_TIMESTAMP WHERE id = ?";
+
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setInt(1, size);
+            stmt.setString(2, bagId);
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            Chuwudai.getInstance().getLogger().severe("保存储物袋容量到SQLite时出错: " + e.getMessage());
+        }
+    }
+
     private void saveBagToYAML(BagData bagData) {
         File bagFile = new File(dataFolder, bagData.getId() + ".yml");
         YamlConfiguration yml = new YamlConfiguration();
@@ -206,6 +231,35 @@ public class BagDataManager {
             yml.save(bagFile);
         } catch (IOException e) {
             Chuwudai.getInstance().getLogger().severe("保存储物袋数据到YAML时出错: " + e.getMessage());
+        }
+    }
+
+    private void saveBagSizeToYAML(String bagId, int size) {
+        File bagFile = new File(dataFolder, bagId + ".yml");
+        if (!bagFile.exists()) {
+            return;
+        }
+
+        try {
+            List<String> lines = Files.readAllLines(bagFile.toPath(), StandardCharsets.UTF_8);
+            boolean updated = false;
+
+            for (int i = 0; i < lines.size(); i++) {
+                String line = lines.get(i);
+                if (!line.startsWith(" ") && !line.startsWith("\t") && line.trim().startsWith("size:")) {
+                    lines.set(i, "size: " + size);
+                    updated = true;
+                    break;
+                }
+            }
+
+            if (!updated) {
+                lines.add("size: " + size);
+            }
+
+            Files.write(bagFile.toPath(), lines, StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            Chuwudai.getInstance().getLogger().severe("保存储物袋容量到YAML时出错: " + e.getMessage());
         }
     }
 

@@ -221,6 +221,18 @@ public class BagListener implements Listener {
             return true;
         }
 
+        BagData currentBag = bagManager.getBagData(bagId);
+        if (currentBag == null) {
+            sendBagMessage(player, "&c储物袋升级失败，数据不存在或当前无法升级！");
+            return true;
+        }
+
+        int maxBagSize = bagManager.getMaxBagSize();
+        if (currentBag.getSize() + BAG_UPGRADE_SLOTS > maxBagSize) {
+            sendBagMessage(player, "&c储物袋容量已达上限，最大容量: &f" + maxBagSize + " &c格");
+            return true;
+        }
+
         BagData upgradedBag = bagManager.upgradeBagSize(bagItem, BAG_UPGRADE_SLOTS);
         if (upgradedBag == null) {
             sendBagMessage(player, "&c储物袋升级失败，数据不存在或当前无法升级！");

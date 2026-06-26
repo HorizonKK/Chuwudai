@@ -69,8 +69,9 @@ public class BagCommand implements CommandExecutor {
                             sender.sendMessage(ColorUtils.translateColorCodes("&7分页说明: 每页最多45格存储，超出部分自动分页"));
                             return true;
                         }
-                        if (size > 540) {
-                            sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&c储物袋大小不能超过540格！&7(最大60排)"));
+                        int maxBagSize = Math.max(9, Chuwudai.getInstance().getConfig().getInt("bag.max-size", 540));
+                        if (size > maxBagSize) {
+                            sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&c储物袋大小不能超过" + maxBagSize + "格！"));
                             return true;
                         }
 
