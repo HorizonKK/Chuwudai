@@ -1,6 +1,7 @@
 package com.horizonkk.chuwudai.pill;
 
 import com.horizonkk.chuwudai.Chuwudai;
+import com.horizonkk.chuwudai.pill.handlers.AttributePackHandler;
 import com.horizonkk.chuwudai.pill.handlers.PotionEffectHandler;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
@@ -54,6 +55,10 @@ public class PillEffectRegistry {
             }
         }
 
+        if (AttributePackHandler.applyAttributePack(player, pillItem)) {
+            appliedEffects.add(AttributePackHandler.describe(pillItem));
+        }
+
         // 应用药水效果（effect_*_time 配置）
         PotionEffectHandler.applyPotionEffects(player, pillItem);
 
@@ -96,7 +101,8 @@ public class PillEffectRegistry {
             }
         }
 
-        return PotionEffectHandler.hasAnyPotionEffect(item);
+        return AttributePackHandler.hasAttributePack(item)
+                || PotionEffectHandler.hasAnyPotionEffect(item);
     }
 
     /**
