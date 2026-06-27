@@ -1,6 +1,7 @@
 package com.horizonkk.chuwudai.api;
 
 import com.horizonkk.chuwudai.Chuwudai;
+import com.horizonkk.chuwudai.bag.BagAutoPickupService;
 import com.horizonkk.chuwudai.bag.BagData;
 import com.horizonkk.chuwudai.bag.BagItem;
 import com.horizonkk.chuwudai.bag.BagManager;
@@ -13,7 +14,9 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -74,6 +77,31 @@ public class ChuwudaiAPI {
      */
     public static void saveBagData(String bagId) {
         bagManager.saveBagData(bagId);
+    }
+
+    /**
+     * Try to store an item in the player's auto-pickup bag.
+     * Respects auto-pickup.enabled, require-slot-zero, and per-player pickup filters.
+     *
+     * @param player player
+     * @param item item to store
+     * @return leftover item, or null if fully stored
+     */
+    public static ItemStack tryAddItemToAutoPickupBag(Player player, ItemStack item) {
+        return BagAutoPickupService.tryStoreItem(player, item).getRemainingItem();
+    }
+
+    /**
+     * Try to store items in the player's auto-pickup bag as a batch.
+     * This is preferred for explosion/mining batches because bag lookup, lore update,
+     * and save queueing are done once for the whole collection.
+     *
+     * @param player player
+     * @param items items to store
+     * @return leftover items that were not stored
+     */
+    public static List<ItemStack> tryAddItemsToAutoPickupBag(Player player, Collection<ItemStack> items) {
+        return BagAutoPickupService.tryStoreItems(player, items).getRemainingItems();
     }
 
     // ==================== 丹瓶API ====================
