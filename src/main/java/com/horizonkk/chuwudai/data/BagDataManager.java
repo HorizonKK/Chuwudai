@@ -11,16 +11,20 @@ import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.sql.*;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.zip.Deflater;
 import java.util.zip.Inflater;
 
 public class BagDataManager {
+    private static final String PAGED_STORAGE_MARKER = "__PAGED_STORAGE_V1__";
 
-    private final Map<String, BagData> loadedBags = new HashMap<>();
+    private final Map<String, BagData> loadedBags = new ConcurrentHashMap<>();
     private final String storageType;
     private final File dataFolder;
     private final String dbPath;
@@ -113,8 +117,14 @@ public class BagDataManager {
                 BagData bagData = new BagData(bagId, size);
 
                 // 解压缩数据后反序列化物品
-                Map<Integer, ItemStack> items = deserializeCompressedItems(data);
-                bagData.setAllItems(items);
+                Map<Integer, ItemStack> pageItems = loadPagedItems(conn, bagId);
+                if (!pageItems.isEmpty() || hasPagedData(conn, bagId)) {
+                    bagData.setAllItems(pageItems);
+                } else if (data != null && !data.isEmpty() && !PAGED_STORAGE_MARKER.equals(data)) {
+                    Map<Integer, ItemStack> items = deserializeCompressedItems(data);
+                    bagData.setAllItems(items);
+                    bagData.markLegacyStorage();
+                }
 
                 return bagData;
             }
@@ -123,6 +133,30 @@ public class BagDataManager {
         }
 
         return null;
+    }
+
+    private boolean hasPagedData(Connection conn, String bagId) throws SQLException {
+        String sql = "SELECT 1 FROM bag_pages WHERE bag_id = ? LIMIT 1";
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, bagId);
+            try (ResultSet rs = stmt.executeQuery()) {
+                return rs.next();
+            }
+        }
+    }
+
+    private Map<Integer, ItemStack> loadPagedItems(Connection conn, String bagId) throws SQLException {
+        String sql = "SELECT data FROM bag_pages WHERE bag_id = ? ORDER BY page";
+        Map<Integer, ItemStack> items = new HashMap<>();
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, bagId);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    items.putAll(deserializeCompressedItems(rs.getString("data")));
+                }
+            }
+        }
+        return items;
     }
 
     private BagData loadBagFromYAML(String bagId) {
@@ -170,10 +204,94 @@ public class BagDataManager {
 
     private void saveBag(BagData bagData, boolean updateCache) {
         if ("sqlite".equalsIgnoreCase(storageType)) {
-            saveBagToSQLite(bagData, updateCache);
+            saveBagToSQLitePaged(bagData, updateCache);
         } else {
             saveBagToYAML(bagData);
         }
+    }
+
+    private void saveBagToSQLitePaged(BagData bagData, boolean updateCache) {
+        Set<Integer> pagesToSave = bagData.isLegacyStorage()
+                ? bagData.getAllPageIndexes()
+                : bagData.getDirtyPages();
+
+        try (Connection conn = DatabaseManager.getConnection()) {
+            conn.setAutoCommit(false);
+            try {
+                upsertBagMetadata(conn, bagData.getId(), bagData.getSize());
+                savePagedItems(conn, bagData, pagesToSave, bagData.isLegacyStorage());
+                conn.commit();
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
+            } finally {
+                conn.setAutoCommit(true);
+            }
+
+            if (updateCache) {
+                loadedBags.put(bagData.getId(), bagData);
+            }
+        } catch (SQLException e) {
+            Chuwudai.getInstance().getLogger().severe("保存分页储物袋数据到SQLite时出错: " + e.getMessage());
+        }
+    }
+
+    private void upsertBagMetadata(Connection conn, String bagId, int size) throws SQLException {
+        String sql = """
+            INSERT OR REPLACE INTO bags (id, size, data, last_modified)
+            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+            """;
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, bagId);
+            stmt.setInt(2, size);
+            stmt.setString(3, PAGED_STORAGE_MARKER);
+            stmt.executeUpdate();
+        }
+    }
+
+    private int savePagedItems(Connection conn, BagData bagData, Set<Integer> pagesToSave, boolean replaceAllPages) throws SQLException {
+        if (replaceAllPages) {
+            try (PreparedStatement deleteAll = conn.prepareStatement("DELETE FROM bag_pages WHERE bag_id = ?")) {
+                deleteAll.setString(1, bagData.getId());
+                deleteAll.executeUpdate();
+            }
+        }
+
+        if (pagesToSave == null || pagesToSave.isEmpty()) {
+            return 0;
+        }
+
+        String upsertSql = """
+            INSERT INTO bag_pages (bag_id, page, data, updated_at)
+            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(bag_id, page) DO UPDATE SET
+                data = excluded.data,
+                updated_at = CURRENT_TIMESTAMP
+            """;
+        String deleteSql = "DELETE FROM bag_pages WHERE bag_id = ? AND page = ?";
+
+        int writtenPages = 0;
+        try (PreparedStatement upsert = conn.prepareStatement(upsertSql);
+             PreparedStatement delete = conn.prepareStatement(deleteSql)) {
+            for (int page : pagesToSave) {
+                Map<Integer, ItemStack> pageItems = bagData.getItemsInPage(page);
+                if (pageItems.isEmpty()) {
+                    delete.setString(1, bagData.getId());
+                    delete.setInt(2, page);
+                    delete.addBatch();
+                    continue;
+                }
+
+                upsert.setString(1, bagData.getId());
+                upsert.setInt(2, page);
+                upsert.setString(3, serializeCompressedItems(pageItems));
+                upsert.addBatch();
+                writtenPages++;
+            }
+            upsert.executeBatch();
+            delete.executeBatch();
+        }
+        return writtenPages;
     }
 
     private void saveBagToSQLite(BagData bagData, boolean updateCache) {
@@ -285,8 +403,14 @@ public class BagDataManager {
                 String data = rs.getString("data");
 
                 BagData bagData = new BagData(bagId, size);
-                Map<Integer, ItemStack> items = deserializeCompressedItems(data);
-                bagData.setAllItems(items);
+                Map<Integer, ItemStack> pageItems = loadPagedItems(conn, bagId);
+                if (!pageItems.isEmpty() || hasPagedData(conn, bagId)) {
+                    bagData.setAllItems(pageItems);
+                } else if (data != null && !data.isEmpty() && !PAGED_STORAGE_MARKER.equals(data)) {
+                    Map<Integer, ItemStack> items = deserializeCompressedItems(data);
+                    bagData.setAllItems(items);
+                    bagData.markLegacyStorage();
+                }
 
                 loadedBags.put(bagId, bagData);
                 count++;
@@ -318,6 +442,9 @@ public class BagDataManager {
     public void saveAllBags() {
         int count = 0;
         for (BagData bagData : loadedBags.values()) {
+            if (!bagData.hasDirtyPages()) {
+                continue;
+            }
             saveBag(bagData);
             count++;
         }
@@ -327,6 +454,119 @@ public class BagDataManager {
     public void close() {
         if ("sqlite".equalsIgnoreCase(storageType)) {
             DatabaseManager.close();
+        }
+    }
+
+    public boolean isSQLiteStorage() {
+        return "sqlite".equalsIgnoreCase(storageType);
+    }
+
+    public MigrationResult migrateLegacyBagsToPagedStorage() {
+        if (!isSQLiteStorage()) {
+            throw new IllegalStateException("Paged migration is only available for sqlite storage.");
+        }
+
+        List<LegacyBagRow> rows = new ArrayList<>();
+        String selectSql = "SELECT id, size, data FROM bags WHERE data IS NOT NULL AND data <> '' AND data <> ?";
+
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(selectSql)) {
+            stmt.setString(1, PAGED_STORAGE_MARKER);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    rows.add(new LegacyBagRow(
+                            rs.getString("id"),
+                            rs.getInt("size"),
+                            rs.getString("data")
+                    ));
+                }
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to scan legacy bag rows.", e);
+        }
+
+        int migratedBags = 0;
+        int failedBags = 0;
+        int writtenPages = 0;
+        int migratedItems = 0;
+
+        for (LegacyBagRow row : rows) {
+            try {
+                Map<Integer, ItemStack> items = deserializeCompressedItems(row.data);
+                BagData bagData = new BagData(row.id, row.size);
+                bagData.setAllItems(items);
+
+                try (Connection conn = DatabaseManager.getConnection()) {
+                    conn.setAutoCommit(false);
+                    try {
+                        upsertBagMetadata(conn, bagData.getId(), bagData.getSize());
+                        writtenPages += savePagedItems(conn, bagData, bagData.getAllPageIndexes(), true);
+                        conn.commit();
+                    } catch (SQLException e) {
+                        conn.rollback();
+                        throw e;
+                    } finally {
+                        conn.setAutoCommit(true);
+                    }
+                }
+
+                loadedBags.put(row.id, bagData);
+                migratedBags++;
+                migratedItems += items.size();
+            } catch (Exception e) {
+                failedBags++;
+                Chuwudai.getInstance().getLogger().severe("Failed to migrate bag " + row.id + " to paged storage: " + e.getMessage());
+            }
+        }
+
+        return new MigrationResult(rows.size(), migratedBags, failedBags, writtenPages, migratedItems);
+    }
+
+    public static final class MigrationResult {
+        private final int scannedBags;
+        private final int migratedBags;
+        private final int failedBags;
+        private final int writtenPages;
+        private final int migratedItems;
+
+        private MigrationResult(int scannedBags, int migratedBags, int failedBags, int writtenPages, int migratedItems) {
+            this.scannedBags = scannedBags;
+            this.migratedBags = migratedBags;
+            this.failedBags = failedBags;
+            this.writtenPages = writtenPages;
+            this.migratedItems = migratedItems;
+        }
+
+        public int getScannedBags() {
+            return scannedBags;
+        }
+
+        public int getMigratedBags() {
+            return migratedBags;
+        }
+
+        public int getFailedBags() {
+            return failedBags;
+        }
+
+        public int getWrittenPages() {
+            return writtenPages;
+        }
+
+        public int getMigratedItems() {
+            return migratedItems;
+        }
+    }
+
+    private static final class LegacyBagRow {
+        private final String id;
+        private final int size;
+        private final String data;
+
+        private LegacyBagRow(String id, int size, String data) {
+            this.id = id;
+            this.size = size;
+            this.data = data;
         }
     }
 

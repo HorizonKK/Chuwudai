@@ -213,7 +213,7 @@ public class BagManager {
                 dirtyBags.add(bagId);
                 return;
             }
-            Chuwudai.getInstance().getDataManager().saveBag(bagCache.get(bagId));
+            Chuwudai.getInstance().getDataManager().saveBagSnapshot(createSnapshotForSave(bagCache.get(bagId)));
             dirtyBags.remove(bagId);
         }
     }
@@ -297,7 +297,7 @@ public class BagManager {
         }
 
         final String saveBagId = bagId;
-        BagData snapshot = bagData.createSaveSnapshot();
+        BagData snapshot = createSnapshotForSave(bagData);
         Chuwudai.getInstance().getServer().getScheduler().runTaskAsynchronously(
                 Chuwudai.getInstance(),
                 () -> {
@@ -332,9 +332,32 @@ public class BagManager {
             return;
         }
 
-        if (bagData != null && dirtyBags.remove(bagId)) {
-            Chuwudai.getInstance().getDataManager().saveBagSnapshot(bagData.createSaveSnapshot());
+        if (bagData != null && dirtyBags.contains(bagId)) {
+            saveDirtyBagData(bagId);
         }
+    }
+
+    public void flushDirtyBagDataSync(String bagId) {
+        if (bagId == null) {
+            return;
+        }
+
+        Integer taskId = pendingSaveTasks.remove(bagId);
+        if (taskId != null) {
+            Chuwudai.getInstance().getServer().getScheduler().cancelTask(taskId);
+        }
+
+        BagData bagData = bagCache.get(bagId);
+        if (bagData != null && dirtyBags.remove(bagId)) {
+            Chuwudai.getInstance().getDataManager().saveBagSnapshot(createSnapshotForSave(bagData));
+        }
+    }
+
+    private BagData createSnapshotForSave(BagData bagData) {
+        if (Chuwudai.getInstance().getDataManager().isSQLiteStorage()) {
+            return bagData.createSaveSnapshot();
+        }
+        return bagData.createFullSaveSnapshot();
     }
 
     public void flushPendingBagSizeSave(String bagId) {
@@ -355,7 +378,7 @@ public class BagManager {
 
     public void flushAllDirtyBags() {
         for (String bagId : new java.util.HashSet<>(dirtyBags)) {
-            flushDirtyBagData(bagId);
+            flushDirtyBagDataSync(bagId);
         }
         for (String bagId : new java.util.HashSet<>(pendingBagSizes.keySet())) {
             flushPendingBagSizeSave(bagId);

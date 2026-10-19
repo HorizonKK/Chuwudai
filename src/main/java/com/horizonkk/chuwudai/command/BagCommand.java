@@ -4,6 +4,7 @@ import com.horizonkk.chuwudai.Chuwudai;
 import com.horizonkk.chuwudai.api.ChuwudaiAPI;
 import com.horizonkk.chuwudai.bag.BagManager;
 import com.horizonkk.chuwudai.Temporary.TempBoxManager;
+import com.horizonkk.chuwudai.data.BagDataManager;
 import com.horizonkk.chuwudai.utlis.BundleStyle;
 import com.horizonkk.chuwudai.utlis.ColorUtils;
 import com.horizonkk.chuwudai.utlis.getSize;
@@ -23,6 +24,7 @@ public class BagCommand implements CommandExecutor {
 
     private final BagManager bagManager;
     private final getSize getSize;
+    private volatile boolean migrationRunning;
 
     public BagCommand() {
         this.bagManager = Chuwudai.getInstance().getBagManager();
@@ -157,6 +159,10 @@ public class BagCommand implements CommandExecutor {
                 }
                 break;
 
+            case "migratepages":
+                handleMigratePagesCommand(sender, args, prefix);
+                break;
+
             case "reload":
                 if (!sender.hasPermission("chuwudai.reload")) {
                     sender.sendMessage(ColorUtils.translateColorCodes(prefix + Chuwudai.getInstance().getConfig().getString("messages.no-permission", "&c你没有权限执行此命令！")));
@@ -289,6 +295,64 @@ public class BagCommand implements CommandExecutor {
                 break;
         }
         return true;
+    }
+
+    private void handleMigratePagesCommand(CommandSender sender, String[] args, String prefix) {
+        if (!sender.hasPermission("chuwudai.migrate")) {
+            sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&cNo permission: chuwudai.migrate"));
+            return;
+        }
+
+        if (args.length < 2 || !"confirm".equalsIgnoreCase(args[1])) {
+            sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&eUsage: /chuwudai migratepages confirm"));
+            sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&7This converts legacy bags.data blobs into bag_pages rows. Back up bags.db first."));
+            return;
+        }
+
+        if (!Chuwudai.getInstance().getDataManager().isSQLiteStorage()) {
+            sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&cPaged migration only supports sqlite storage."));
+            return;
+        }
+
+        if (migrationRunning) {
+            sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&cA page migration is already running."));
+            return;
+        }
+
+        migrationRunning = true;
+        sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&aStarted legacy bag page migration asynchronously."));
+
+        Chuwudai plugin = Chuwudai.getInstance();
+        plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+            BagDataManager.MigrationResult result = null;
+            Throwable error = null;
+            long start = System.nanoTime();
+
+            try {
+                result = plugin.getDataManager().migrateLegacyBagsToPagedStorage();
+            } catch (Throwable t) {
+                error = t;
+            }
+
+            BagDataManager.MigrationResult finalResult = result;
+            Throwable finalError = error;
+            long elapsedNanos = System.nanoTime() - start;
+            plugin.getServer().getScheduler().runTask(plugin, () -> {
+                migrationRunning = false;
+                if (finalError != null) {
+                    sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&cPage migration failed: " + finalError.getMessage()));
+                    return;
+                }
+
+                sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&aPage migration complete."));
+                sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&7Scanned bags: &f" + finalResult.getScannedBags()
+                        + " &7Migrated: &f" + finalResult.getMigratedBags()
+                        + " &7Failed: &f" + finalResult.getFailedBags()));
+                sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&7Written pages: &f" + finalResult.getWrittenPages()
+                        + " &7Items: &f" + finalResult.getMigratedItems()
+                        + " &7Time: &e" + String.format("%.3f", elapsedNanos / 1_000_000.0) + " ms"));
+            });
+        });
     }
 
     private void handleGetBagCommand(CommandSender sender, String[] args, String prefix) {
@@ -490,6 +554,9 @@ public class BagCommand implements CommandExecutor {
         }
         if (sender.hasPermission("chuwudai.tempbox")) {
             sender.sendMessage(ColorUtils.translateColorCodes("&e/chuwudai tempbox [玩家] &7- 打开暂存箱(54格，关服自动清理)"));
+        }
+        if (sender.hasPermission("chuwudai.migrate")) {
+            sender.sendMessage(ColorUtils.translateColorCodes("&e/chuwudai migratepages confirm &7- migrate legacy bag blobs into paged storage"));
         }
         if (sender.hasPermission("chuwudai.reload")) {
             sender.sendMessage(ColorUtils.translateColorCodes("&e/chuwudai reload &7- 重载插件配置文件"));

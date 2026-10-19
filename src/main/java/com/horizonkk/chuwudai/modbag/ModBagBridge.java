@@ -127,7 +127,7 @@ public class ModBagBridge implements Listener, PluginMessageListener {
         for (UUID viewer : viewers) {
             Player player = Bukkit.getPlayer(viewer);
             if (player != null) {
-                closeExistingSession(player, true);
+                closeExistingSession(player, true, true);
             }
         }
         sessions.clear();
@@ -629,6 +629,10 @@ public class ModBagBridge implements Listener, PluginMessageListener {
     }
 
     private void closeExistingSession(Player player, boolean notifyClient) {
+        closeExistingSession(player, notifyClient, false);
+    }
+
+    private void closeExistingSession(Player player, boolean notifyClient, boolean syncSave) {
         BagSession session = sessions.remove(player.getUniqueId());
         if (session == null) {
             return;
@@ -637,7 +641,11 @@ public class ModBagBridge implements Listener, PluginMessageListener {
         if (session.mode == BagOpenMode.MOD) {
             returnCursorItem(player, session);
             BagData bagData = getOrCreateBagData(session.bagId);
-            plugin.getBagManager().flushDirtyBagData(bagData.getId());
+            if (syncSave) {
+                plugin.getBagManager().flushDirtyBagDataSync(bagData.getId());
+            } else {
+                plugin.getBagManager().flushDirtyBagData(bagData.getId());
+            }
             updateBagLore(player, bagData);
             if (notifyClient) {
                 ModBagByteBuf buf = ModBagByteBuf.writer();

@@ -67,7 +67,6 @@ public class PillUseEvent implements Listener {
             }
             return;
         }
-
         // 直接吃丹药（物品自身带有 liandan NBT 效果）
         if (PillEffectRegistry.hasAnyEffect(item)) {
             event.setCancelled(true);

@@ -45,6 +45,15 @@ public class DatabaseManager {
             last_modified TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """;
+        String createBagPagesTableSQL = """
+            CREATE TABLE IF NOT EXISTS bag_pages (
+                bag_id TEXT NOT NULL,
+                page INTEGER NOT NULL,
+                data TEXT NOT NULL,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (bag_id, page)
+            )
+            """;
         String createPillsTableSQL = """
             CREATE TABLE IF NOT EXISTS pills (
                 id TEXT PRIMARY KEY,
@@ -56,8 +65,10 @@ public class DatabaseManager {
 
         try (Connection conn = getConnection();
              PreparedStatement stmtBags = conn.prepareStatement(createBagsTableSQL);
+             PreparedStatement stmtBagPages = conn.prepareStatement(createBagPagesTableSQL);
              PreparedStatement stmtPills = conn.prepareStatement(createPillsTableSQL)) {
             stmtBags.execute();
+            stmtBagPages.execute();
             stmtPills.execute();
         } catch (SQLException e) {
             e.printStackTrace();

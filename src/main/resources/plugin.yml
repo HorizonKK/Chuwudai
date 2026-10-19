@@ -14,7 +14,7 @@ commands:
   chuwudai:
     description: 储物袋主命令
     aliases: [cd, bag]
-    usage: /<command> <give|getbag|open|tempbox|reload|help>
+    usage: /<command> <give|getbag|open|tempbox|migratepages|reload|help>
 
 permissions:
   chuwudai.give:
@@ -38,6 +38,9 @@ permissions:
   chuwudai.reload:
     description: 允许重载插件
     default: op
+  chuwudai.migrate:
+    description: Allows migrating legacy bag blob data into paged storage
+    default: op
   chuwudai.*:
     description: 所有储物袋权限
     default: op
@@ -48,3 +51,4 @@ permissions:
       chuwudai.tempbox: true
       chuwudai.tempbox.others: true
       chuwudai.reload: true
+      chuwudai.migrate: true

@@ -5,16 +5,22 @@ import com.horizonkk.chuwudai.hook.NeigeitemsHook;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 public class BagData {
+    public static final int STORAGE_PAGE_SIZE = 45;
     
     private final String id;
     private int size;
     private final Map<Integer, ItemStack> items;
     private final Map<String, Integer> stoneCounts;
     private final Map<String, Integer> niItemCounts;
+    private final Set<Integer> dirtyPages;
+    private boolean legacyStorage;
     
     public BagData(String id, int size) {
         this.id = id;
@@ -22,6 +28,7 @@ public class BagData {
         this.items = new HashMap<>();
         this.stoneCounts = new HashMap<>();
         this.niItemCounts = new HashMap<>();
+        this.dirtyPages = new HashSet<>();
         initializeStoneCounts();
     }
     
@@ -54,6 +61,7 @@ public class BagData {
             items.put(slot, normalized.clone());
             adjustCachedCounts(normalized, 1);
         }
+        markSlotDirty(slot);
     }
 
     /**
@@ -72,6 +80,9 @@ public class BagData {
     public void removeItem(int slot) {
         ItemStack oldItem = items.remove(slot);
         adjustCachedCounts(oldItem, -1);
+        if (oldItem != null) {
+            markSlotDirty(slot);
+        }
     }
 
     /**
@@ -293,7 +304,7 @@ public class BagData {
     }
     public int getTotalPages() {
         // 每页实际存储45格，计算需要多少页
-        return (int) Math.ceil((double) size / 45);
+        return (int) Math.ceil((double) size / STORAGE_PAGE_SIZE);
     }
 
     public Map<Integer, ItemStack> getAllItems() {
@@ -315,14 +326,95 @@ public class BagData {
             }
         }
         updateCachedCounts();
+        dirtyPages.clear();
     }
 
     public BagData createSaveSnapshot() {
         BagData snapshot = new BagData(id, size);
+        Set<Integer> pagesToSnapshot = legacyStorage ? getAllPageIndexes() : new HashSet<>(dirtyPages);
+
+        for (Map.Entry<Integer, ItemStack> entry : items.entrySet()) {
+            int slot = entry.getKey();
+            int page = getPageForSlot(slot);
+            if (pagesToSnapshot.contains(page)) {
+                snapshot.setItemSilent(slot, entry.getValue());
+            }
+        }
+        snapshot.dirtyPages.addAll(pagesToSnapshot);
+        snapshot.legacyStorage = legacyStorage;
+        dirtyPages.removeAll(pagesToSnapshot);
+        legacyStorage = false;
+        return snapshot;
+    }
+
+    public BagData createFullSaveSnapshot() {
+        BagData snapshot = new BagData(id, size);
         for (Map.Entry<Integer, ItemStack> entry : items.entrySet()) {
             snapshot.setItemSilent(entry.getKey(), entry.getValue());
         }
-        snapshot.updateCachedCounts();
+        snapshot.dirtyPages.addAll(getAllPageIndexes());
+        snapshot.legacyStorage = legacyStorage;
+        dirtyPages.clear();
+        legacyStorage = false;
         return snapshot;
+    }
+
+    public Set<Integer> getDirtyPages() {
+        return new HashSet<>(dirtyPages);
+    }
+
+    public boolean hasDirtyPages() {
+        return !dirtyPages.isEmpty();
+    }
+
+    public boolean isLegacyStorage() {
+        return legacyStorage;
+    }
+
+    public void markLegacyStorage() {
+        this.legacyStorage = true;
+    }
+
+    public Set<Integer> getAllPageIndexes() {
+        int totalPages = getTotalPages();
+        if (totalPages <= 0) {
+            return Collections.emptySet();
+        }
+        Set<Integer> pages = new HashSet<>();
+        for (int page = 0; page < totalPages; page++) {
+            pages.add(page);
+        }
+        return pages;
+    }
+
+    public Map<Integer, ItemStack> getItemsInPage(int page) {
+        Map<Integer, ItemStack> pageItems = new HashMap<>();
+        if (page < 0) {
+            return pageItems;
+        }
+
+        int startSlot = page * STORAGE_PAGE_SIZE;
+        int endSlot = Math.min(size, startSlot + STORAGE_PAGE_SIZE);
+        for (Map.Entry<Integer, ItemStack> entry : items.entrySet()) {
+            int slot = entry.getKey();
+            if (slot < startSlot || slot >= endSlot) {
+                continue;
+            }
+            ItemStack item = entry.getValue();
+            if (item != null) {
+                pageItems.put(slot, item.clone());
+            }
+        }
+        return pageItems;
+    }
+
+    private void markSlotDirty(int slot) {
+        if (slot >= 0) {
+            dirtyPages.add(getPageForSlot(slot));
+        }
+    }
+
+    private int getPageForSlot(int slot) {
+        return slot / STORAGE_PAGE_SIZE;
     }
 }
