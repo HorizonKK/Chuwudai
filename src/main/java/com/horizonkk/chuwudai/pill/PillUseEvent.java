@@ -16,7 +16,7 @@ import org.bukkit.persistence.PersistentDataType;
 
 public class PillUseEvent implements Listener {
 
-    @EventHandler
+    @EventHandler(ignoreCancelled = true)
     public void onPlayerConsumeItem(PlayerItemConsumeEvent event) {
         Player player = event.getPlayer();
         ItemStack item = event.getItem();
@@ -42,7 +42,9 @@ public class PillUseEvent implements Listener {
                         }
                     }
                     if (foundPill != null && foundSlot >= 0) {
-                        executePillEffect(player, foundPill);
+                        if (!executePillEffect(player, foundPill)) {
+                            return;
+                        }
                         if (foundPill.getAmount() > 1) {
                             foundPill.setAmount(foundPill.getAmount() - 1);
                             pillData.setItem(foundSlot, foundPill);
@@ -67,10 +69,12 @@ public class PillUseEvent implements Listener {
             }
             return;
         }
-        // 直接吃丹药（物品自身带有 liandan NBT 效果）
+        // 直接吃丹药（物品自身带有 liandan 或 tupo_<境界> NBT 效果）
         if (PillEffectRegistry.hasAnyEffect(item)) {
             event.setCancelled(true);
-            executePillEffect(player, item);
+            if (!executePillEffect(player, item)) {
+                return;
+            }
 
             consumeHeldItem(player, item);
 
@@ -84,8 +88,14 @@ public class PillUseEvent implements Listener {
     }
 
 
-    private void executePillEffect(Player player, ItemStack pillItem) {
-        PillEffectRegistry.executeAllEffects(player, pillItem);
+    private boolean executePillEffect(Player player, ItemStack pillItem) {
+        boolean applied = PillEffectRegistry.tryExecuteAllEffects(player, pillItem);
+        if (!applied) {
+            player.sendMessage(ColorUtils.translateColorCodes(
+                    Chuwudai.getInstance().getConfig().getString("messages.prefix", "&8[&6储物袋&8] &f") +
+                            "&c丹药效果未生效，未消耗丹药，请联系管理员检查突破配置。"));
+        }
+        return applied;
     }
 
     private void consumeHeldItem(Player player, ItemStack consumed) {

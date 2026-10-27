@@ -3,6 +3,7 @@ package com.horizonkk.chuwudai.pill;
 import com.horizonkk.chuwudai.Chuwudai;
 import com.horizonkk.chuwudai.pill.handlers.AttributePackHandler;
 import com.horizonkk.chuwudai.pill.handlers.PotionEffectHandler;
+import com.horizonkk.chuwudai.pill.handlers.TuPoHandler;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -19,8 +20,13 @@ public class PillEffectRegistry {
      * 执行物品的所有丹药效果
      */
     public static void executeAllEffects(Player player, ItemStack pillItem) {
-        if (!pillItem.hasItemMeta()) {
-            return;
+        tryExecuteAllEffects(player, pillItem);
+    }
+
+    /** 执行丹药效果；纯突破丹全部失败时返回 false，调用方应保留丹药。 */
+    public static boolean tryExecuteAllEffects(Player player, ItemStack pillItem) {
+        if (pillItem == null || !pillItem.hasItemMeta()) {
+            return false;
         }
 
         ItemMeta meta = pillItem.getItemMeta();
@@ -62,12 +68,19 @@ public class PillEffectRegistry {
         // 应用药水效果（effect_*_time 配置）
         PotionEffectHandler.applyPotionEffects(player, pillItem);
 
+        // 最后发放永久突破加成，避免其他 Handler 抛错后丹药未扣除却已增加概率。
+        TuPoHandler.Result breakthrough = TuPoHandler.applyEffects(player, pillItem);
+        appliedEffects.addAll(breakthrough.appliedEffects());
+
         // 记录日志（可选）
         if (!appliedEffects.isEmpty()) {
             Chuwudai.getInstance().getLogger().info(
                     "玩家 " + player.getName() + " 服用丹药，应用效果: " + String.join(", ", appliedEffects)
             );
         }
+        // 混合丹有任一效果生效即消耗，防止成功的永久加成被重复领取。
+        return !breakthrough.hasTags() || !appliedEffects.isEmpty()
+                || PotionEffectHandler.hasAnyPotionEffect(pillItem);
     }
 
     /**
@@ -85,9 +98,15 @@ public class PillEffectRegistry {
     }
 
     /**
-     * 检查物品是否包含任何丹药效果（枚举效果或药水效果）
+     * 检查物品是否包含任何丹药效果（含动态 tupo_<境界> 标签）
      */
     public static boolean hasAnyEffect(ItemStack item) {
+        if (item == null) {
+            return false;
+        }
+        if (TuPoHandler.hasAnyEffect(item)) {
+            return true;
+        }
         if (!item.hasItemMeta()) {
             return false;
         }
