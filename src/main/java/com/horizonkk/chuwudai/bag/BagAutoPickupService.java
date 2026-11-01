@@ -45,6 +45,12 @@ public final class BagAutoPickupService {
         }
 
         String bagId = BagItem.getBagId(bagItem);
+        if(Chuwudai.getInstance().getSharedStorage()!=null) {
+            var shared=Chuwudai.getInstance().getSharedStorage();
+            var key=new com.horizonkk.chuwudai.storage.MySqlRepository.Key(com.horizonkk.chuwudai.storage.MySqlRepository.Kind.BAG,bagId);
+            if(com.horizonkk.chuwudai.storage.StorageListener.isViewed(key)) return new BatchStorageResult(new java.util.ArrayList<>(items),0,false);
+            if(!shared.isReady(key)) { shared.prepare(key).exceptionally(e->null); return new BatchStorageResult(new java.util.ArrayList<>(items),0,false); }
+        }
         BagData bagData = Chuwudai.getInstance().getBagManager().getBagData(bagId);
         if (bagData == null) {
             addClones(remainingItems, items);

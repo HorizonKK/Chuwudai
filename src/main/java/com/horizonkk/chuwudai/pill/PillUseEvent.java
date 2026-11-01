@@ -29,6 +29,11 @@ public class PillUseEvent implements Listener {
             event.setCancelled(true);
             String pillId = PillItem.getPillId(item);
             if (pillId != null) {
+                if(Chuwudai.getInstance().getSharedStorage()!=null) {
+                    var shared=Chuwudai.getInstance().getSharedStorage();
+                    var key=new com.horizonkk.chuwudai.storage.MySqlRepository.Key(com.horizonkk.chuwudai.storage.MySqlRepository.Kind.PILL,pillId);
+                    if(!shared.isReady(key) || com.horizonkk.chuwudai.storage.StorageListener.isViewed(key)) { shared.prepare(key).exceptionally(e->null); player.sendMessage("§c丹瓶尚未就绪或正在使用，请稍后重试"); return; }
+                }
                 PillData pillData = Chuwudai.getInstance().getPillManager().getPillData(pillId);
                 if (pillData != null) {
                     ItemStack foundPill = null;

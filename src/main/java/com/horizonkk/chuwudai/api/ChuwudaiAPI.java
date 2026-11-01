@@ -31,6 +31,89 @@ public class ChuwudaiAPI {
     private static final PillManager pillManager = plugin.getPillManager();
     private static final TempBoxManager tempBoxManager = plugin.getTempBoxManager();
 
+    private static com.horizonkk.chuwudai.storage.MySqlRepository.Key storageKey(com.horizonkk.chuwudai.storage.MySqlRepository.Kind kind, String id) { return new com.horizonkk.chuwudai.storage.MySqlRepository.Key(kind,id); }
+    public static java.util.concurrent.CompletableFuture<Void> preparePlayerAsync(Player player) {
+        var shared=plugin.getSharedStorage();
+        return shared==null ? java.util.concurrent.CompletableFuture.completedFuture(null) : shared.onMain(()->shared.preparePlayer(player)).thenCompose(f->f);
+    }
+    public static java.util.concurrent.CompletableFuture<Void> flushAndReleasePlayerAsync(Player player) {
+        var shared=plugin.getSharedStorage();
+        return shared==null ? java.util.concurrent.CompletableFuture.completedFuture(null) : shared.onMain(()->{ player.closeInventory(); return shared.releasePlayer(player); }).thenCompose(f->f);
+    }
+    public static java.util.concurrent.CompletableFuture<ItemStack> createBagAsync(int size,String style) {
+        var shared=plugin.getSharedStorage();
+        if(size<=0 || size%9!=0 || size>bagManager.getMaxBagSize()) return java.util.concurrent.CompletableFuture.failedFuture(new IllegalArgumentException("Invalid bag size"));
+        if(shared==null) { ItemStack item=createBag(size,style); plugin.getDataManager().saveBag(new BagData(BagItem.getBagId(item),size)); return java.util.concurrent.CompletableFuture.completedFuture(item); }
+        return shared.onMain(()->shared.create(com.horizonkk.chuwudai.storage.MySqlRepository.Kind.BAG,size)).thenCompose(f->f).thenCompose(id->shared.onMain(()->BagItem.createBag(size,id,style)));
+    }
+    public static java.util.concurrent.CompletableFuture<ItemStack> createPillAsync(int size) {
+        var shared=plugin.getSharedStorage();
+        if(!java.util.Set.of(9,18,27).contains(size)) return java.util.concurrent.CompletableFuture.failedFuture(new IllegalArgumentException("Invalid pill size"));
+        if(shared==null) { ItemStack item=createPill(size); plugin.getPillDataManager().savePill(new PillData(PillItem.getPillId(item),size)); return java.util.concurrent.CompletableFuture.completedFuture(item); }
+        return shared.onMain(()->shared.create(com.horizonkk.chuwudai.storage.MySqlRepository.Kind.PILL,size)).thenCompose(f->f).thenCompose(id->shared.onMain(()->PillItem.createPill(size,id)));
+    }
+    public static java.util.concurrent.CompletableFuture<BagData> loadBagAsync(String id) {
+        var shared=plugin.getSharedStorage();
+        if(shared==null) return java.util.concurrent.CompletableFuture.completedFuture(getBagData(id));
+        var key=storageKey(com.horizonkk.chuwudai.storage.MySqlRepository.Kind.BAG,id);
+        return shared.onMain(()->shared.prepare(key)).thenCompose(f->f).thenCompose(v->shared.onMain(()->getBagData(id)));
+    }
+    public static java.util.concurrent.CompletableFuture<PillData> loadPillAsync(String id) {
+        var shared=plugin.getSharedStorage();
+        if(shared==null) return java.util.concurrent.CompletableFuture.completedFuture(getPillData(id));
+        var key=storageKey(com.horizonkk.chuwudai.storage.MySqlRepository.Kind.PILL,id);
+        return shared.onMain(()->shared.prepare(key)).thenCompose(f->f).thenCompose(v->shared.onMain(()->getPillData(id)));
+    }
+    public static java.util.concurrent.CompletableFuture<Void> mutateBagAsync(String id,java.util.function.Consumer<BagData> mutation) {
+        return loadBagAsync(id).thenCompose(data->{
+            BagData staged=new BagData(id,data.getSize()); staged.setAllItems(data.getAllItems());
+            mutation.accept(staged);
+            if(staged.getSize()>bagManager.getMaxBagSize()) throw new IllegalArgumentException("Bag exceeds maximum size");
+            data.setSize(staged.getSize()); data.setAllItems(staged.getAllItems());
+            if(plugin.getSharedStorage()==null) { plugin.getDataManager().saveBag(data.createFullSaveSnapshot()); return java.util.concurrent.CompletableFuture.completedFuture(null); }
+            return saveBagDataAsync(id);
+        });
+    }
+    public static java.util.concurrent.CompletableFuture<Void> mutatePillAsync(String id,java.util.function.Consumer<PillData> mutation) {
+        return loadPillAsync(id).thenCompose(data->{
+            PillData staged=new PillData(id,data.getSize()); staged.setAllItems(data.getAllItems());
+            mutation.accept(staged); data.setAllItems(staged.getAllItems()); return savePillDataAsync(id);
+        });
+    }
+    public static java.util.concurrent.CompletableFuture<Void> saveBagDataAsync(String id) {
+        var shared=plugin.getSharedStorage();
+        if(shared==null) { saveBagData(id); return java.util.concurrent.CompletableFuture.completedFuture(null); }
+        return shared.onMain(()->shared.flush(storageKey(com.horizonkk.chuwudai.storage.MySqlRepository.Kind.BAG,id))).thenCompose(f->f);
+    }
+    public static java.util.concurrent.CompletableFuture<Void> savePillDataAsync(String id) {
+        var shared=plugin.getSharedStorage();
+        if(shared==null) { savePillData(id); return java.util.concurrent.CompletableFuture.completedFuture(null); }
+        return shared.onMain(()->shared.flush(storageKey(com.horizonkk.chuwudai.storage.MySqlRepository.Kind.PILL,id))).thenCompose(f->f);
+    }
+    public static java.util.concurrent.CompletableFuture<Boolean> addItemToTempBoxAsync(UUID uuid, ItemStack item) {
+        var shared=plugin.getSharedStorage();
+        if(shared==null) { boolean added=tempBoxManager.addItem(uuid,item); return tempBoxManager.flushAsync().thenApply(v->added); }
+        var key=storageKey(com.horizonkk.chuwudai.storage.MySqlRepository.Kind.TEMP,uuid.toString());
+        return shared.onMain(()->shared.prepare(key)).thenCompose(f->f).thenCompose(v->shared.onMain(()->{
+            boolean added=tempBoxManager.addItem(uuid,item); return shared.flush(key).thenApply(done->added);
+        })).thenCompose(f->f);
+    }
+
+    public static java.util.concurrent.CompletableFuture<Map<Integer,ItemStack>> getTempBoxItemsAsync(UUID uuid) {
+        var shared=plugin.getSharedStorage();
+        if(shared==null) return java.util.concurrent.CompletableFuture.completedFuture(tempBoxManager.getPlayerItems(uuid));
+        var key=storageKey(com.horizonkk.chuwudai.storage.MySqlRepository.Kind.TEMP,uuid.toString());
+        return shared.onMain(()->shared.prepare(key)).thenCompose(f->f).thenCompose(v->shared.onMain(()->tempBoxManager.getPlayerItems(uuid)));
+    }
+    public static java.util.concurrent.CompletableFuture<Void> clearTempBoxAsync(UUID uuid) {
+        return getTempBoxItemsAsync(uuid).thenCompose(items->{tempBoxManager.clearBox(uuid); return saveTempBoxAsync(uuid);});
+    }
+    public static java.util.concurrent.CompletableFuture<Void> saveTempBoxAsync(UUID uuid) {
+        var shared=plugin.getSharedStorage();
+        if(shared==null) return tempBoxManager.flushAsync();
+        return shared.onMain(()->shared.flush(storageKey(com.horizonkk.chuwudai.storage.MySqlRepository.Kind.TEMP,uuid.toString()))).thenCompose(f->f);
+    }
+
     // ==================== 储物袋API ====================
 
     /**
@@ -273,6 +356,7 @@ public class ChuwudaiAPI {
      * @return 实际扣除的数量
      */
     public static int deductStoneFromPlayerInventory(Player player, String stoneType, int amount) {
+        if(plugin.getSharedStorage()!=null) plugin.getSharedStorage().requirePlayer(player);
         if (amount <= 0) return 0;
 
         int deducted = 0;
@@ -389,6 +473,7 @@ public class ChuwudaiAPI {
      * @return 扣除结果
      */
     public static StoneDeductionResult deductStoneFromPlayerFirst(Player player, String stoneType, int amount) {
+        if(plugin.getSharedStorage()!=null) plugin.getSharedStorage().requirePlayer(player);
         if (amount <= 0) {
             return new StoneDeductionResult(0, "扣除数量必须大于0");
         }
@@ -423,6 +508,7 @@ public class ChuwudaiAPI {
      * @return 批量扣除结果
      */
     public static BatchStoneDeductionResult deductStonesFromPlayerFirst(Player player, Map<String, Integer> requiredStones) {
+        if(plugin.getSharedStorage()!=null) plugin.getSharedStorage().requirePlayer(player);
         if (requiredStones == null || requiredStones.isEmpty()) {
             return new BatchStoneDeductionResult(new HashMap<>(), new HashMap<>());
         }
@@ -468,6 +554,7 @@ public class ChuwudaiAPI {
      * @return 实际扣除的数量
      */
     public static int deductStoneFromBagSlot(Player player, int bagSlot, String stoneType, int amount) {
+        if(plugin.getSharedStorage()!=null) plugin.getSharedStorage().requirePlayer(player);
         if (amount <= 0) return 0;
 
         PlayerInventory inventory = player.getInventory();
@@ -543,6 +630,7 @@ public class ChuwudaiAPI {
      * @return 扣除结果信息
      */
     public static StoneDeductionResult deductStoneFromSpecificBag(Player player, int bagSlot, String stoneType, int amount) {
+        if(plugin.getSharedStorage()!=null) plugin.getSharedStorage().requirePlayer(player);
         if (amount <= 0) {
             return new StoneDeductionResult(0, "扣除数量必须大于0");
         }
@@ -600,6 +688,7 @@ public class ChuwudaiAPI {
      * @return 扣除结果信息
      */
     public static StoneDeductionResult deductStoneFromAnyBag(Player player, String stoneType, int amount) {
+        if(plugin.getSharedStorage()!=null) plugin.getSharedStorage().requirePlayer(player);
         if (amount <= 0) {
             return new StoneDeductionResult(0, "扣除数量必须大于0");
         }
@@ -650,6 +739,7 @@ public class ChuwudaiAPI {
      * @return 批量扣除结果
      */
     public static BatchStoneDeductionResult deductStonesFromSpecificBag(Player player, int bagSlot, Map<String, Integer> requiredStones) {
+        if(plugin.getSharedStorage()!=null) plugin.getSharedStorage().requirePlayer(player);
         if (requiredStones == null || requiredStones.isEmpty()) {
             return new BatchStoneDeductionResult(new HashMap<>(), new HashMap<>());
         }
@@ -702,6 +792,7 @@ public class ChuwudaiAPI {
      * @return 批量扣除结果
      */
     public static BatchStoneDeductionResult deductStonesFromAnyBag(Player player, Map<String, Integer> requiredStones) {
+        if(plugin.getSharedStorage()!=null) plugin.getSharedStorage().requirePlayer(player);
         if (requiredStones == null || requiredStones.isEmpty()) {
             return new BatchStoneDeductionResult(new HashMap<>(), new HashMap<>());
         }
@@ -869,6 +960,7 @@ public class ChuwudaiAPI {
      * @return 实际扣除数量
      */
     public static int deductNiItemFromBagSlot(Player player, int bagSlot, String itemId, int amount) {
+        if(plugin.getSharedStorage()!=null) plugin.getSharedStorage().requirePlayer(player);
         return NeigeitemsHook.deductNiItemFromBagSlot(player, bagSlot, itemId, amount);
     }
 
@@ -881,6 +973,7 @@ public class ChuwudaiAPI {
      * @return 扣除结果
      */
     public static NeigeitemsHook.NiItemDeductionResult deductNiItemFromSpecificBag(Player player, int bagSlot, String itemId, int amount) {
+        if(plugin.getSharedStorage()!=null) plugin.getSharedStorage().requirePlayer(player);
         return NeigeitemsHook.deductNiItemFromSpecificBag(player, bagSlot, itemId, amount);
     }
 
@@ -893,6 +986,7 @@ public class ChuwudaiAPI {
      * @return 批量扣除结果
      */
     public static NeigeitemsHook.BatchNiItemDeductionResult deductNiItemsFromSpecificBag(Player player, int bagSlot, Map<String, Integer> requiredItems) {
+        if(plugin.getSharedStorage()!=null) plugin.getSharedStorage().requirePlayer(player);
         return NeigeitemsHook.deductNiItemsFromSpecificBag(player, bagSlot, requiredItems);
     }
 

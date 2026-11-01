@@ -4,6 +4,7 @@ import com.horizonkk.chuwudai.Chuwudai;
 import com.horizonkk.chuwudai.utlis.BundleStyle;
 import com.horizonkk.chuwudai.utlis.ColorUtils;
 import org.bukkit.Bukkit;
+import org.bukkit.Material;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
@@ -17,6 +18,8 @@ import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class BagManager {
+    private com.horizonkk.chuwudai.storage.SharedStorage shared() { return Chuwudai.getInstance().getSharedStorage(); }
+    private com.horizonkk.chuwudai.storage.MySqlRepository.Key key(String id) { return new com.horizonkk.chuwudai.storage.MySqlRepository.Key(com.horizonkk.chuwudai.storage.MySqlRepository.Kind.BAG,id); }
 
     private final Random random = new Random();
     private final Map<String, BagData> bagCache = new WeakHashMap<>();
@@ -30,6 +33,7 @@ public class BagManager {
 
     // 生成8位随机ID
     public String generateBagId() {
+        if(shared()!=null) throw new com.horizonkk.chuwudai.storage.StorageAccessException(com.horizonkk.chuwudai.storage.StorageAccessException.Reason.NOT_READY,"MySQL 创建请使用 createBagAsync");
         String id;
         do {
             id = String.format("%08d", random.nextInt(100000000));
@@ -56,6 +60,7 @@ public class BagManager {
 
     // 给予玩家储物袋（指定样式）
     public void giveBagToPlayer(Player player, int size, String style) {
+        if(shared()!=null) { com.horizonkk.chuwudai.api.ChuwudaiAPI.createBagAsync(size,style).whenComplete((item,e)->shared().onMain(()->{ if(e!=null) player.sendMessage("§c创建失败："+e.getMessage()); else if(player.isOnline()) player.getInventory().addItem(item).values().forEach(left->player.getWorld().dropItemNaturally(player.getLocation(),left)); return null; })); return; }
         ItemStack bag = createBagItem(size, style);
         String bagId = BagItem.getBagId(bag);
 
@@ -94,6 +99,22 @@ public class BagManager {
 
     // 打开储物袋界面
     public void openBag(Player player, String bagId) {
+        if(bagId==null || bagId.isBlank() || findBagInPlayerInventory(player,bagId)==null) { player.sendMessage("§c你必须携带对应的储物袋才能打开！"); return; }
+        if(shared()!=null && !shared().isReady(key(bagId))) {
+            shared().prepare(key(bagId)).whenComplete((v,e)->shared().onMain(()->{
+                if(player.isOnline()) { if(e==null) openBag(player,bagId); else player.sendMessage("§c容器暂不可用："+e.getMessage()); }
+                return null;
+            })); return;
+        }
+        if(shared()!=null && com.horizonkk.chuwudai.storage.StorageListener.isViewed(key(bagId))) { player.sendMessage("§c容器正在使用中"); return; }
+
+        // ID 仅用于定位数据，必须先验证玩家实际携带对应物品，再读取数据或发送模组界面。
+        if (bagId == null || bagId.isBlank() || findBagInPlayerInventory(player, bagId) == null) {
+            player.sendMessage(ColorUtils.translateColorCodes(Chuwudai.getInstance().getConfig().getString("messages.prefix", "&8[&6储物袋&8] &f") +
+                    Chuwudai.getInstance().getConfig().getString("messages.bag-not-carried", "&c你必须携带对应的储物袋才能打开！")));
+            return;
+        }
+
         if (Chuwudai.getInstance().getModBagBridge() != null
                 && Chuwudai.getInstance().getModBagBridge().openBag(player, bagId)) {
             return;
@@ -122,7 +143,7 @@ public class BagManager {
 
     private ItemStack findBagInPlayerInventory(Player player, String bagId) {
         for (ItemStack item : player.getInventory().getContents()) {
-            if (item != null && BagItem.isBagItem(item)) {
+            if (item != null && item.getType() != Material.AIR && item.getAmount() > 0 && BagItem.isBagItem(item)) {
                 String itemBagId = BagItem.getBagId(item);
                 if (bagId.equals(itemBagId)) {
                     return item;
@@ -134,6 +155,7 @@ public class BagManager {
 
     // 获取或创建储物袋数据
     public BagData getBagData(String bagId) {
+        if(shared()!=null) return (BagData)shared().get(key(bagId));
         if (bagCache.containsKey(bagId)) {
             return bagCache.get(bagId);
         }
@@ -204,6 +226,7 @@ public class BagManager {
     }
 
     public void saveBagData(String bagId) {
+        if(shared()!=null) { shared().flush(key(bagId)); return; }
         if (bagCache.containsKey(bagId)) {
             Integer taskId = pendingSaveTasks.remove(bagId);
             if (taskId != null) {
@@ -213,12 +236,14 @@ public class BagManager {
                 dirtyBags.add(bagId);
                 return;
             }
-            Chuwudai.getInstance().getDataManager().saveBagSnapshot(createSnapshotForSave(bagCache.get(bagId)));
+            BagData current=bagCache.get(bagId); BagData snapshot=createSnapshotForSave(current);
+            Chuwudai.getInstance().getDataManager().saveBagSnapshot(snapshot); current.acknowledgeSnapshot(snapshot);
             dirtyBags.remove(bagId);
         }
     }
 
     public void queueBagSave(String bagId) {
+        if(shared()!=null) { shared().touch(key(bagId)); return; }
         if (bagId == null || !bagCache.containsKey(bagId)) {
             return;
         }
@@ -236,6 +261,7 @@ public class BagManager {
     }
 
     public void queueBagSizeSave(String bagId, int size) {
+        if(shared()!=null) { shared().touch(key(bagId)); return; }
         if (bagId == null) {
             return;
         }
@@ -277,6 +303,7 @@ public class BagManager {
     }
 
     public void saveDirtyBagData(String bagId) {
+        if(shared()!=null) { shared().touch(key(bagId)); return; }
         if (bagId == null || !dirtyBags.contains(bagId)) {
             return;
         }
@@ -301,15 +328,22 @@ public class BagManager {
         Chuwudai.getInstance().getServer().getScheduler().runTaskAsynchronously(
                 Chuwudai.getInstance(),
                 () -> {
+                    boolean success=false;
                     try {
                         Chuwudai.getInstance().getDataManager().saveBagSnapshot(snapshot);
+                        success=true;
+                    } catch(RuntimeException e) {
+                        dirtyBags.add(saveBagId);
+                        Chuwudai.getInstance().getLogger().warning("储物袋保存失败，保留待保存状态: "+saveBagId);
                     } finally {
+                        final boolean saved=success;
                         Chuwudai.getInstance().getServer().getScheduler().runTask(
                                 Chuwudai.getInstance(),
                                 () -> {
+                                    if(saved) bagData.acknowledgeSnapshot(snapshot);
                                     savingBags.remove(saveBagId);
                                     if (dirtyBags.contains(saveBagId)) {
-                                        saveDirtyBagData(saveBagId);
+                                        queueBagSave(saveBagId);
                                     }
                                 });
                     }
@@ -317,6 +351,7 @@ public class BagManager {
     }
 
     public void flushDirtyBagData(String bagId) {
+        if(shared()!=null) { shared().flush(key(bagId)); return; }
         if (bagId == null) {
             return;
         }
@@ -338,6 +373,7 @@ public class BagManager {
     }
 
     public void flushDirtyBagDataSync(String bagId) {
+        if(shared()!=null) { shared().flush(key(bagId)); return; }
         if (bagId == null) {
             return;
         }
@@ -348,8 +384,9 @@ public class BagManager {
         }
 
         BagData bagData = bagCache.get(bagId);
-        if (bagData != null && dirtyBags.remove(bagId)) {
-            Chuwudai.getInstance().getDataManager().saveBagSnapshot(createSnapshotForSave(bagData));
+        if (bagData != null && dirtyBags.contains(bagId)) {
+            BagData snapshot=createSnapshotForSave(bagData);
+            Chuwudai.getInstance().getDataManager().saveBagSnapshot(snapshot); bagData.acknowledgeSnapshot(snapshot); dirtyBags.remove(bagId);
         }
     }
 
@@ -361,6 +398,7 @@ public class BagManager {
     }
 
     public void flushPendingBagSizeSave(String bagId) {
+        if(shared()!=null) { shared().flush(key(bagId)); return; }
         if (bagId == null) {
             return;
         }
@@ -377,6 +415,7 @@ public class BagManager {
     }
 
     public void flushAllDirtyBags() {
+        if(shared()!=null) return;
         for (String bagId : new java.util.HashSet<>(dirtyBags)) {
             flushDirtyBagDataSync(bagId);
         }

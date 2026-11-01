@@ -26,7 +26,7 @@ public class EfficientItemSerializationUtil {
         
         // 将YAML配置转换为字节数组，然后Base64编码
         String yamlString = config.saveToString();
-        return Base64.getEncoder().encodeToString(yamlString.getBytes());
+        return Base64.getEncoder().encodeToString(yamlString.getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
     
     public static Map<Integer, ItemStack> deserializeItems(String data) {
@@ -39,7 +39,7 @@ public class EfficientItemSerializationUtil {
         try {
             // Base64解码，然后解析YAML
             byte[] decodedBytes = Base64.getDecoder().decode(data);
-            String yamlString = new String(decodedBytes);
+            String yamlString = new String(decodedBytes, java.nio.charset.StandardCharsets.UTF_8);
             
             YamlConfiguration config = new YamlConfiguration();
             config.loadFromString(yamlString);
@@ -53,7 +53,7 @@ public class EfficientItemSerializationUtil {
                 }
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            throw new com.horizonkk.chuwudai.storage.StorageAccessException(com.horizonkk.chuwudai.storage.StorageAccessException.Reason.CORRUPT, "Corrupt item payload", e);
         }
         
         return items;

@@ -27,7 +27,7 @@ public class PillListener implements Listener {
     }
 
     // 按Shift右键打开丹瓶
-    @EventHandler
+    @EventHandler(ignoreCancelled = true)
     public void onPlayerInteract(PlayerInteractEvent event) {
         // 检查是否是右键操作
         if (event.getAction() == org.bukkit.event.block.Action.RIGHT_CLICK_AIR ||
@@ -52,7 +52,7 @@ public class PillListener implements Listener {
     }
 
     // 检测在背包中右键丹瓶
-    @EventHandler
+    @EventHandler(ignoreCancelled = true)
     public void onInventoryClick(InventoryClickEvent event) {
         // 检查点击类型是否是右键
         if (event.getClick() != ClickType.RIGHT) {
@@ -92,7 +92,7 @@ public class PillListener implements Listener {
     }
 
     // 处理丹瓶内部的点击事件
-    @EventHandler
+    @EventHandler(ignoreCancelled = true)
     public void onInventoryClickInPill(InventoryClickEvent event) {
         if (event.getInventory().getHolder() instanceof PillInventory) {
             PillInventory pillInventory = (PillInventory) event.getInventory().getHolder();
@@ -142,14 +142,14 @@ public class PillListener implements Listener {
                 PillItem.updatePillLore(pillItem, pillInventory.getPillData().getPillNames());
             }
             // 异步保存数据
-            Chuwudai.getInstance().getServer().getScheduler().runTaskAsynchronously(Chuwudai.getInstance(), () -> {
+            Chuwudai.getInstance().getServer().getScheduler().runTask(Chuwudai.getInstance(), () -> {
                 pillInventory.saveItems();
             });
         }
     }
 
     // 处理丹瓶关闭事件
-    @EventHandler
+    @EventHandler(ignoreCancelled = true)
     public void onInventoryClose(InventoryCloseEvent event) {
         if (event.getInventory().getHolder() instanceof PillInventory) {
             PillInventory pillInventory = (PillInventory) event.getInventory().getHolder();
@@ -172,7 +172,7 @@ public class PillListener implements Listener {
     }
 
     // 检查Shift点击（快速移动）
-    @EventHandler
+    @EventHandler(ignoreCancelled = true)
     public void onInventoryDragInPill(InventoryDragEvent event) {
         if (event.getInventory().getHolder() instanceof PillInventory) {
             PillInventory pillInventory = (PillInventory) event.getInventory().getHolder();

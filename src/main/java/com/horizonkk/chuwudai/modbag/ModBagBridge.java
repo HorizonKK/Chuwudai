@@ -190,6 +190,13 @@ public class ModBagBridge implements Listener, PluginMessageListener {
     }
 
     private void handleClick(Player player, byte[] message) {
+        var shared=plugin.getSharedStorage(); var session=sessions.get(player.getUniqueId());
+        if(shared==null || session==null) { handleClickInternal(player,message); return; }
+        var key=new com.horizonkk.chuwudai.storage.MySqlRepository.Key(com.horizonkk.chuwudai.storage.MySqlRepository.Kind.BAG,session.bagId);
+        if(!shared.isReady(key)) { player.sendMessage("§c储物袋正在保存或暂不可用"); return; }
+        shared.withViewChange(key,()->handleClickInternal(player,message));
+    }
+    private void handleClickInternal(Player player, byte[] message) {
         ModBagByteBuf buf = ModBagByteBuf.reader(message);
         String bagId = buf.readString(MAX_ID_LENGTH);
         int revision = buf.readVarInt();
@@ -647,6 +654,7 @@ public class ModBagBridge implements Listener, PluginMessageListener {
                 plugin.getBagManager().flushDirtyBagData(bagData.getId());
             }
             updateBagLore(player, bagData);
+            if(plugin.getSharedStorage()!=null) plugin.getSharedStorage().release(new com.horizonkk.chuwudai.storage.MySqlRepository.Key(com.horizonkk.chuwudai.storage.MySqlRepository.Kind.BAG,session.bagId)).exceptionally(e->null);
             if (notifyClient) {
                 ModBagByteBuf buf = ModBagByteBuf.writer();
                 buf.writeString(session.bagId);
@@ -710,6 +718,7 @@ public class ModBagBridge implements Listener, PluginMessageListener {
         if (bagData != null) {
             return bagData;
         }
+        if(plugin.getSharedStorage()!=null) throw new com.horizonkk.chuwudai.storage.StorageAccessException(com.horizonkk.chuwudai.storage.StorageAccessException.Reason.NOT_FOUND,"储物袋不存在");
         BagData created = new BagData(bagId, 27);
         plugin.getDataManager().saveBag(created);
         return created;

@@ -47,6 +47,7 @@ public class PlaceholderAPI extends PlaceholderExpansion {
 
     @Override
     public @Nullable String onPlaceholderRequest(Player player, @NotNull String params) {
+        if(!org.bukkit.Bukkit.isPrimaryThread()) return "--";
         if (player == null) {
             return "";
         }
@@ -61,6 +62,11 @@ public class PlaceholderAPI extends PlaceholderExpansion {
         ItemStack item = player.getInventory().getItem(targetSlot);
         if (item != null && BagItem.isBagItem(item)) {
             String bagId = BagItem.getBagId(item);
+            if(plugin.getSharedStorage()!=null) {
+                var shared=plugin.getSharedStorage();
+                var key=new com.horizonkk.chuwudai.storage.MySqlRepository.Key(com.horizonkk.chuwudai.storage.MySqlRepository.Kind.BAG,bagId);
+                if(!shared.isReady(key)) { shared.prepare(key).exceptionally(e->null); return "--"; }
+            }
             BagData bagData = plugin.getBagManager().getBagData(bagId);
             if (bagData != null) {
                 Map<String, Integer> bagStones = bagData.getStoneCounts();

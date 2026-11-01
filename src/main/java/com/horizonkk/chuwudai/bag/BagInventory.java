@@ -272,6 +272,12 @@ public class BagInventory implements InventoryHolder {
     }
 
     public void saveItems() {
+        var shared=Chuwudai.getInstance().getSharedStorage();
+        if(shared==null) { saveItemsInternal(); return; }
+        var key=new com.horizonkk.chuwudai.storage.MySqlRepository.Key(com.horizonkk.chuwudai.storage.MySqlRepository.Kind.BAG,bagData.getId());
+        if(shared.isReady(key)) shared.withViewChange(key,this::saveItemsInternal);
+    }
+    private void saveItemsInternal() {
         boolean changed = false;
         for (int invSlot : slotMapping.keySet()) {
             int dataSlot = slotMapping.get(invSlot);

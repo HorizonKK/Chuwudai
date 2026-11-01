@@ -24,7 +24,7 @@ permissions:
     description: 允许按ID补发已有储物袋
     default: op
   chuwudai.open:
-    description: 允许打开储物袋
+    description: 允许通过命令打开背包中携带的储物袋
     default: true
   chuwudai.tempbox:
     description: 允许打开暂存箱

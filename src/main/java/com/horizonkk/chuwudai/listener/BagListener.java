@@ -31,7 +31,7 @@ public class BagListener implements Listener {
     }
 
     // 保持原来的手持物品右键打开功能（可选）
-    @EventHandler
+    @EventHandler(ignoreCancelled = true)
     public void onPlayerInteract(PlayerInteractEvent event) {
         // 检查是否是右键空气、方块或者物品
         if (event.getAction() == org.bukkit.event.block.Action.RIGHT_CLICK_AIR ||
@@ -50,7 +50,7 @@ public class BagListener implements Listener {
     }
 
     // 新添加：检测在背包中右键储物袋
-    @EventHandler
+    @EventHandler(ignoreCancelled = true)
     public void onInventoryClick(InventoryClickEvent event) {
         if (handleBagUpgradeClick(event)) {
             return;
@@ -94,7 +94,7 @@ public class BagListener implements Listener {
     }
 
     // 原有的事件处理（保持不动）
-    @EventHandler
+    @EventHandler(ignoreCancelled = true)
     public void onInventoryClickInBag(InventoryClickEvent event) {
         if (event.getInventory().getHolder() instanceof BagOptionsInventory) {
             event.setCancelled(true);
@@ -175,7 +175,7 @@ public class BagListener implements Listener {
         return -1;
     }
 
-    @EventHandler
+    @EventHandler(ignoreCancelled = true)
     public void onInventoryClose(InventoryCloseEvent event) {
         if (event.getInventory().getHolder() instanceof BagInventory) {
             BagInventory bagInventory =
@@ -221,6 +221,11 @@ public class BagListener implements Listener {
             return true;
         }
 
+        if(Chuwudai.getInstance().getSharedStorage()!=null) {
+            var shared=Chuwudai.getInstance().getSharedStorage();
+            var key=new com.horizonkk.chuwudai.storage.MySqlRepository.Key(com.horizonkk.chuwudai.storage.MySqlRepository.Kind.BAG,bagId);
+            if(!shared.isReady(key)) { event.setCancelled(true); shared.prepare(key).exceptionally(e->null); event.getWhoClicked().sendMessage("§c储物袋正在加载，请稍后重试"); return true; }
+        }
         BagData currentBag = bagManager.getBagData(bagId);
         if (currentBag == null) {
             sendBagMessage(player, "&c储物袋升级失败，数据不存在或当前无法升级！");

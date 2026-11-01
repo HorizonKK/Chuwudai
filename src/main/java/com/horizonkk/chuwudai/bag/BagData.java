@@ -12,6 +12,10 @@ import java.util.Map;
 import java.util.Set;
 
 public class BagData {
+    private Runnable storageCheck, storageChanged;
+    public void bindStorage(Runnable check, Runnable changed) { this.storageCheck=check; this.storageChanged=changed; }
+    private void beforeMutation() { if(storageCheck!=null) { storageCheck.run(); storageChanged.run(); } }
+
     public static final int STORAGE_PAGE_SIZE = 45;
     
     private final String id;
@@ -21,6 +25,8 @@ public class BagData {
     private final Map<String, Integer> niItemCounts;
     private final Set<Integer> dirtyPages;
     private boolean legacyStorage;
+    private final Map<Integer,Long> pageVersions=new HashMap<>();
+    private long nextPageVersion;
     
     public BagData(String id, int size) {
         this.id = id;
@@ -47,6 +53,7 @@ public class BagData {
     
     // 设置物品
     public void setItem(int slot, ItemStack item) {
+        beforeMutation();
         ItemStack normalized = normalizeItem(item);
         ItemStack oldItem = items.get(slot);
 
@@ -68,6 +75,7 @@ public class BagData {
      * 设置物品但不触发灵石计数更新（批量操作时使用，完后手动调 updateStoneCounts）
      */
     public void setItemSilent(int slot, ItemStack item) {
+        beforeMutation();
         ItemStack normalized = normalizeItem(item);
         if (normalized == null) {
             items.remove(slot);
@@ -78,6 +86,7 @@ public class BagData {
 
     // 移除物品
     public void removeItem(int slot) {
+        beforeMutation();
         ItemStack oldItem = items.remove(slot);
         adjustCachedCounts(oldItem, -1);
         if (oldItem != null) {
@@ -89,6 +98,7 @@ public class BagData {
      * 移除物品但不触发灵石计数更新（批量操作时使用，完后手动调 updateStoneCounts）
      */
     public void removeItemSilent(int slot) {
+        beforeMutation();
         items.remove(slot);
     }
 
@@ -96,14 +106,17 @@ public class BagData {
      * 扣除指定类型的灵石计数（批量扣除时直接维护，O(1) 避免全量扫描）
      */
     public void decrementStoneCount(String stoneType, int amount) {
+        beforeMutation();
         adjustCount(stoneCounts, stoneType, -amount);
     }
 
     public void incrementNiItemCount(String itemId, int amount) {
+        beforeMutation();
         adjustCount(niItemCounts, itemId, amount);
     }
 
     public void decrementNiItemCount(String itemId, int amount) {
+        beforeMutation();
         adjustCount(niItemCounts, itemId, -amount);
     }
 
@@ -290,6 +303,7 @@ public class BagData {
     public int getSize() { return size; }
 
     public void setSize(int size) {
+        beforeMutation();
         if (size <= 0) {
             throw new IllegalArgumentException("Bag size must be positive");
         }
@@ -319,6 +333,7 @@ public class BagData {
     }
 
     public void setAllItems(Map<Integer, ItemStack> newItems) {
+        beforeMutation();
         this.items.clear();
         if (newItems != null) {
             for (Map.Entry<Integer, ItemStack> entry : newItems.entrySet()) {
@@ -342,8 +357,7 @@ public class BagData {
         }
         snapshot.dirtyPages.addAll(pagesToSnapshot);
         snapshot.legacyStorage = legacyStorage;
-        dirtyPages.removeAll(pagesToSnapshot);
-        legacyStorage = false;
+        snapshot.pageVersions.putAll(pageVersions);
         return snapshot;
     }
 
@@ -354,11 +368,14 @@ public class BagData {
         }
         snapshot.dirtyPages.addAll(getAllPageIndexes());
         snapshot.legacyStorage = legacyStorage;
-        dirtyPages.clear();
-        legacyStorage = false;
+        snapshot.pageVersions.putAll(pageVersions);
         return snapshot;
     }
 
+    public void acknowledgeSnapshot(BagData snapshot) {
+        for(int page:snapshot.dirtyPages) if(java.util.Objects.equals(pageVersions.get(page),snapshot.pageVersions.get(page))) dirtyPages.remove(page);
+        if(snapshot.legacyStorage) legacyStorage=false;
+    }
     public Set<Integer> getDirtyPages() {
         return new HashSet<>(dirtyPages);
     }
@@ -411,6 +428,7 @@ public class BagData {
     private void markSlotDirty(int slot) {
         if (slot >= 0) {
             dirtyPages.add(getPageForSlot(slot));
+            pageVersions.put(getPageForSlot(slot),++nextPageVersion);
         }
     }
 

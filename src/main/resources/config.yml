@@ -1,7 +1,21 @@
 # 储物袋插件配置文件
 # 存储方式配置
 storage:
-  type: "sqlite"  # 可选: yaml, sqlite
+  type: "sqlite"  # 可选: yaml, sqlite, mysql
+  server-id: "survival-1" # MySQL 模式下每服必须唯一，修改后重启
+  save-delay-ticks: 60
+  lease-seconds: 30
+  heartbeat-seconds: 10
+  mysql:
+    host: "127.0.0.1"
+    port: 3306
+    database: "chuwudai"
+    username: "chuwudai"
+    password: ""
+    table-prefix: "chuwudai_"
+    maximum-pool-size: 10
+    connection-timeout-ms: 5000
+    ssl-mode: "PREFERRED"
   sqlite:
     file: "bags.db"  # SQLite数据库文件路径
   yaml:

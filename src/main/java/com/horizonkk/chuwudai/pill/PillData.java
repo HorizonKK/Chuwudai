@@ -6,6 +6,10 @@ import org.bukkit.inventory.ItemStack;
 import java.util.*;
 
 public class PillData {
+    private Runnable storageCheck, storageChanged;
+    public void bindStorage(Runnable check, Runnable changed) { this.storageCheck=check; this.storageChanged=changed; }
+    private void beforeMutation() { if(storageCheck!=null) { storageCheck.run(); storageChanged.run(); } }
+
     
     private final String id;
     private final int size;
@@ -22,11 +26,12 @@ public class PillData {
     
     // 获取物品
     public ItemStack getItem(int slot) {
-        return items.get(slot);
+        ItemStack item=items.get(slot); return item==null ? null : item.clone();
     }
     
     // 设置物品
     public void setItem(int slot, ItemStack item) {
+        beforeMutation();
         if (slot < 0 || slot >= size) {
             throw new IllegalArgumentException("槽位超出范围: " + slot);
         }
@@ -35,12 +40,13 @@ public class PillData {
             throw new IllegalArgumentException("物品不是丹药类型: " + item.getType());
         }
         
-        items.put(slot, item);
+        items.put(slot, item == null ? null : item.clone());
         updatePillNames();
     }
     
     // 移除物品
     public void removeItem(int slot) {
+        beforeMutation();
         items.remove(slot);
         updatePillNames();
     }
@@ -100,10 +106,11 @@ public class PillData {
     }
     
     public Map<Integer, ItemStack> getAllItems() {
-        return new HashMap<>(items);
+        Map<Integer, ItemStack> copy=new HashMap<>(); items.forEach((slot,item)->{ if(item!=null) copy.put(slot,item.clone()); }); return copy;
     }
     
     public void setAllItems(Map<Integer, ItemStack> newItems) {
+        beforeMutation();
         this.items.clear();
         for (Map.Entry<Integer, ItemStack> entry : newItems.entrySet()) {
             Integer slot = entry.getKey();
@@ -114,7 +121,7 @@ public class PillData {
                     Chuwudai.getInstance().getLogger().warning("尝试添加非丹药物品到丹瓶: " + item.getType());
                     continue;
                 }
-                this.items.put(slot, item);
+                this.items.put(slot, item == null ? null : item.clone());
             }
         }
         updatePillNames();

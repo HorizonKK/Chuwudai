@@ -22,6 +22,9 @@ import java.util.zip.Deflater;
 import java.util.zip.Inflater;
 
 public class BagDataManager {
+    private boolean mysql() { return Chuwudai.getInstance().getSharedStorage()!=null; }
+    private com.horizonkk.chuwudai.storage.MySqlRepository.Key key(String id) { return new com.horizonkk.chuwudai.storage.MySqlRepository.Key(com.horizonkk.chuwudai.storage.MySqlRepository.Kind.BAG, id); }
+
     private static final String PAGED_STORAGE_MARKER = "__PAGED_STORAGE_V1__";
 
     private final Map<String, BagData> loadedBags = new ConcurrentHashMap<>();
@@ -40,7 +43,9 @@ public class BagDataManager {
             this.dataFolder = null;
 
             // 初始化数据库连接池
-            DatabaseManager.initialize(dbPath);
+            // Connection pool is owned by Chuwudai.
+        } else if ("mysql".equalsIgnoreCase(storageType)) {
+            this.dbPath=null; this.dataFolder=null;
         } else {
             // YAML存储（默认）
             String folder = Chuwudai.getInstance().getConfig().getString("storage.yaml.folder", "bags");
@@ -53,6 +58,7 @@ public class BagDataManager {
     }
 
     public boolean bagExists(String bagId) {
+        if(mysql()) { Chuwudai.getInstance().getSharedStorage().get(key(bagId)); return true; }
         if ("sqlite".equalsIgnoreCase(storageType)) {
             return bagExistsInSQLite(bagId);
         } else {
@@ -82,6 +88,7 @@ public class BagDataManager {
     }
 
     public BagData loadBag(String bagId) {
+        if(mysql()) return (BagData)Chuwudai.getInstance().getSharedStorage().get(key(bagId));
         // 如果已经在内存中，直接返回
         if (loadedBags.containsKey(bagId)) {
             return loadedBags.get(bagId);
@@ -195,6 +202,7 @@ public class BagDataManager {
     }
 
     public void saveBagSize(String bagId, int size) {
+        if(mysql()) { Chuwudai.getInstance().getSharedStorage().touch(key(bagId)); return; }
         if ("sqlite".equalsIgnoreCase(storageType)) {
             saveBagSizeToSQLite(bagId, size);
         } else {
@@ -203,6 +211,7 @@ public class BagDataManager {
     }
 
     private void saveBag(BagData bagData, boolean updateCache) {
+        if(mysql()) { Chuwudai.getInstance().getSharedStorage().touch(key(bagData.getId())); return; }
         if ("sqlite".equalsIgnoreCase(storageType)) {
             saveBagToSQLitePaged(bagData, updateCache);
         } else {
@@ -232,7 +241,7 @@ public class BagDataManager {
                 loadedBags.put(bagData.getId(), bagData);
             }
         } catch (SQLException e) {
-            Chuwudai.getInstance().getLogger().severe("保存分页储物袋数据到SQLite时出错: " + e.getMessage());
+            throw new com.horizonkk.chuwudai.storage.StorageAccessException(com.horizonkk.chuwudai.storage.StorageAccessException.Reason.UNAVAILABLE,"保存储物袋失败",e);
         }
     }
 
@@ -382,6 +391,7 @@ public class BagDataManager {
     }
 
     public void loadAllBags() {
+        if(mysql()) return;
         if ("sqlite".equalsIgnoreCase(storageType)) {
             loadAllBagsFromSQLite();
         } else {
@@ -440,6 +450,7 @@ public class BagDataManager {
     }
 
     public void saveAllBags() {
+        if(mysql()) return;
         int count = 0;
         for (BagData bagData : loadedBags.values()) {
             if (!bagData.hasDirtyPages()) {
@@ -453,7 +464,7 @@ public class BagDataManager {
 
     public void close() {
         if ("sqlite".equalsIgnoreCase(storageType)) {
-            DatabaseManager.close();
+            // Pool is closed once by Chuwudai.
         }
     }
 

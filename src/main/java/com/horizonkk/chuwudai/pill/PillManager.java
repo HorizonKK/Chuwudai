@@ -11,12 +11,17 @@ import java.util.Map;
 import java.util.Random;
 
 public class PillManager {
+    private com.horizonkk.chuwudai.storage.SharedStorage shared() { return Chuwudai.getInstance().getSharedStorage(); }
+    private com.horizonkk.chuwudai.storage.MySqlRepository.Key key(String id) { return new com.horizonkk.chuwudai.storage.MySqlRepository.Key(com.horizonkk.chuwudai.storage.MySqlRepository.Kind.PILL,id); }
+
+
 
     private final Random random = new Random();
     private final Map<String, PillData> pillCache = new HashMap<>();
 
     // 生成8位随机ID
     public String generatePillId() {
+        if(shared()!=null) throw new com.horizonkk.chuwudai.storage.StorageAccessException(com.horizonkk.chuwudai.storage.StorageAccessException.Reason.NOT_READY,"MySQL 创建请使用 createPillAsync");
         String id;
         do {
             id = String.format("%08d", random.nextInt(100000000));
@@ -31,13 +36,14 @@ public class PillManager {
 
     // 给予玩家丹瓶
     public void givePillToPlayer(Player player, int size) {
+        if(shared()!=null) { com.horizonkk.chuwudai.api.ChuwudaiAPI.createPillAsync(size).whenComplete((item,e)->shared().onMain(()->{ if(e!=null) player.sendMessage("§c创建失败："+e.getMessage()); else if(player.isOnline()) player.getInventory().addItem(item).values().forEach(left->player.getWorld().dropItemNaturally(player.getLocation(),left)); return null; })); return; }
         ItemStack pill = createPillItem(size);
         String pillId = PillItem.getPillId(pill); // 获取新生成的ID
-        
+
         // 创建空的丹瓶数据并保存
         PillData emptyPillData = new PillData(pillId, size);
         Chuwudai.getInstance().getPillDataManager().savePill(emptyPillData);
-        
+
         Map<Integer, ItemStack> leftover = player.getInventory().addItem(pill);
         if (!leftover.isEmpty()) {
             // 背包已满，掉落在地上
@@ -68,6 +74,15 @@ public class PillManager {
 
     // 打开丹瓶界面
     public void openPill(Player player, String pillId) {
+        if(pillId==null || java.util.Arrays.stream(player.getInventory().getContents()).noneMatch(item->item!=null && item.getAmount()>0 && PillItem.isPillItem(item) && pillId.equals(PillItem.getPillId(item)))) { player.sendMessage("§c你必须携带对应的丹瓶才能打开！"); return; }
+        if(shared()!=null && !shared().isReady(key(pillId))) {
+            shared().prepare(key(pillId)).whenComplete((v,e)->shared().onMain(()->{
+                if(player.isOnline()) { if(e==null) openPill(player,pillId); else player.sendMessage("§c容器暂不可用："+e.getMessage()); }
+                return null;
+            })); return;
+        }
+        if(shared()!=null && com.horizonkk.chuwudai.storage.StorageListener.isViewed(key(pillId))) { player.sendMessage("§c容器正在使用中"); return; }
+
         PillData pillData = getPillData(pillId);
         if (pillData == null) {
             player.sendMessage(ColorUtils.translateColorCodes(Chuwudai.getInstance().getConfig().getString("messages.prefix", "&8[&6储物袋&8] &f") +
@@ -95,6 +110,7 @@ public class PillManager {
 
     // 获取或创建丹瓶数据
     public PillData getPillData(String pillId) {
+        if(shared()!=null) return (PillData)shared().get(key(pillId));
         if (pillCache.containsKey(pillId)) {
             return pillCache.get(pillId);
         }
@@ -108,6 +124,7 @@ public class PillManager {
 
     // 保存丹瓶数据
     public void savePillData(String pillId) {
+        if(shared()!=null) { shared().touch(key(pillId)); return; }
         if (pillCache.containsKey(pillId)) {
             Chuwudai.getInstance().getPillDataManager().savePill(pillCache.get(pillId));
         }

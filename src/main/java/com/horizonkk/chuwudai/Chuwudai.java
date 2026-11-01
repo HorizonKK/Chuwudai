@@ -26,6 +26,9 @@ public final class Chuwudai extends JavaPlugin {
     private PillDataManager pillDataManager;
     private TempBoxManager tempBoxManager;
     private ModBagBridge modBagBridge;
+    private String activeStorageType;
+    private com.horizonkk.chuwudai.storage.SharedStorage sharedStorage;
+    public com.horizonkk.chuwudai.storage.SharedStorage getSharedStorage() { return sharedStorage; }
 
     @Override
     public void onEnable() {
@@ -34,6 +37,11 @@ public final class Chuwudai extends JavaPlugin {
         // 保存默认配置文件
         saveDefaultConfig();
 
+        String storageType=getConfig().getString("storage.type","sqlite").toLowerCase(java.util.Locale.ROOT);
+        activeStorageType=storageType;
+        if (!java.util.Set.of("sqlite","yaml","mysql").contains(storageType)) throw new IllegalArgumentException("Unknown storage.type");
+        if(storageType.equals("sqlite")) DatabaseManager.initialize(new java.io.File(getDataFolder(),getConfig().getString("storage.sqlite.file","bags.db")).getPath());
+        if(storageType.equals("mysql")) sharedStorage=new com.horizonkk.chuwudai.storage.SharedStorage(this);
         // 初始化管理器
         this.dataManager = new BagDataManager();
         this.bagManager = new BagManager();
@@ -55,6 +63,8 @@ public final class Chuwudai extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new PillUseEvent(), this);
         getServer().getPluginManager().registerEvents(new TempBoxListener(), this);
 
+        getServer().getPluginManager().registerEvents(new com.horizonkk.chuwudai.storage.StorageListener(this), this);
+
         // 注册 PlaceholderAPI 扩展
         if (getServer().getPluginManager().getPlugin("PlaceholderAPI") != null) {
             new PlaceholderAPI(this).register();
@@ -64,7 +74,7 @@ public final class Chuwudai extends JavaPlugin {
         }
 
         // 异步加载数据
-        getServer().getScheduler().runTaskAsynchronously(this, () -> {
+        getServer().getScheduler().runTask(this, () -> {
             dataManager.loadAllBags();
             pillDataManager.loadAllPills();
             getLogger().info("储物袋和丹瓶插件已加载完成！");
@@ -73,20 +83,23 @@ public final class Chuwudai extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (tempBoxManager != null) tempBoxManager.close();
         if (modBagBridge != null) {
-            modBagBridge.closeAll();
+            try { modBagBridge.closeAll(); } catch(RuntimeException e) { getLogger().warning("界面关闭失败，继续保存容器: "+e.getMessage()); }
         }
         if (bagManager != null) {
             bagManager.flushAllDirtyBags();
         }
+        if (sharedStorage != null) { sharedStorage.close(); return; }
         // 保存所有数据
-        dataManager.saveAllBags();
-        pillDataManager.saveAllPills();
+        if(dataManager!=null) dataManager.saveAllBags();
+        if(pillDataManager!=null) pillDataManager.saveAllPills();
         // 执行数据库优化 清理过期的数据
-        DatabaseManager.vacuum();
+        if("sqlite".equals(activeStorageType)) DatabaseManager.vacuum();
+        DatabaseManager.close();
         // 关闭数据库连接池
-        dataManager.close();
-        pillDataManager.close();
+        if(dataManager!=null) dataManager.close();
+        if(pillDataManager!=null) pillDataManager.close();
         getLogger().info("储物袋插件已安全关闭！");
     }
 

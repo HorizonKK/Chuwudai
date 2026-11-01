@@ -210,6 +210,7 @@ public class NeigeitemsHook {
      * @return 实际扣除数量
      */
     public static int deductNiItemFromBagSlot(Player player, int bagSlot, String itemId, int amount) {
+        if(Chuwudai.getInstance().getSharedStorage()!=null) Chuwudai.getInstance().getSharedStorage().requirePlayer(player);
         if (amount <= 0 || itemId == null || itemId.isEmpty()) return 0;
         if (!isNeigeItemsAvailable()) return 0;
 
@@ -235,6 +236,7 @@ public class NeigeitemsHook {
      * @return 扣除结果
      */
     public static NiItemDeductionResult deductNiItemFromSpecificBag(Player player, int bagSlot, String itemId, int amount) {
+        if(Chuwudai.getInstance().getSharedStorage()!=null) Chuwudai.getInstance().getSharedStorage().requirePlayer(player);
         if (amount <= 0) {
             return new NiItemDeductionResult(itemId, 0, amount, "扣除数量必须大于0");
         }
@@ -293,6 +295,7 @@ public class NeigeitemsHook {
      * @return 批量扣除结果
      */
     public static BatchNiItemDeductionResult deductNiItemsFromSpecificBag(Player player, int bagSlot, Map<String, Integer> requiredItems) {
+        if(Chuwudai.getInstance().getSharedStorage()!=null) Chuwudai.getInstance().getSharedStorage().requirePlayer(player);
         Map<String, Integer> needed = sanitizeRequiredAmounts(requiredItems);
         if (needed.isEmpty()) {
             return new BatchNiItemDeductionResult(new HashMap<>(), new HashMap<>());

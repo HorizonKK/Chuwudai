@@ -33,6 +33,14 @@ public class BagCommand implements CommandExecutor {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        try { return executeCommand(sender,command,label,args); }
+        catch(com.horizonkk.chuwudai.storage.StorageAccessException e) {
+            sender.sendMessage("§c容器暂不可用："+e.getMessage());
+            if(sender instanceof Player player && Chuwudai.getInstance().getSharedStorage()!=null) Chuwudai.getInstance().getSharedStorage().preparePlayer(player).exceptionally(error->null);
+            return true;
+        }
+    }
+    private boolean executeCommand(CommandSender sender, Command command, String label, String[] args) {
         String prefix = Chuwudai.getInstance().getConfig().getString("messages.prefix", "&8[&6储物袋&8] &f");
 
         if (args.length == 0) {
@@ -91,7 +99,7 @@ public class BagCommand implements CommandExecutor {
                             bagManager.giveBagToPlayer(target, size);
                         }
 
-                        sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&a已成功给予玩家 &e" + target.getName() + " &a一个 &b" + getSize.getBagSizeName(size) + "储物袋&a(&e" + size + "格&a, &e" + styleName + "&a样式)"));
+                        sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&a已提交发放请求，目标玩家 &e" + target.getName() + " &a一个 &b" + getSize.getBagSizeName(size) + "储物袋&a(&e" + size + "格&a, &e" + styleName + "&a样式)"));
                     } else if (type.equals("pill") || type.equals("丹瓶")) {
                         List<Integer> validPillSizes = Arrays.asList(9, 18, 27);
                         if (!validPillSizes.contains(size)) {
@@ -99,7 +107,7 @@ public class BagCommand implements CommandExecutor {
                             return true;
                         }
                         Chuwudai.getInstance().getPillManager().givePillToPlayer(target, size);
-                        sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&a已成功给予玩家 &e" + target.getName() + " &a一个 &d" + getSize.getPillSizeName(size) + "丹瓶"));
+                        sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&a已提交发放请求，目标玩家 &e" + target.getName() + " &a一个 &d" + getSize.getPillSizeName(size) + "丹瓶"));
                     } else {
                         sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&c无效的类型！&7请输入 &fbag&7(储物袋) 或 &fpill&7(丹瓶)"));
                     }
@@ -169,7 +177,7 @@ public class BagCommand implements CommandExecutor {
                     return true;
                 }
                 Chuwudai.getInstance().reloadConfig();
-                sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&a配置文件已成功重载！"));
+                sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&a配置文件已成功重载！存储后端、连接和服务器标识变更需要重启。"));
                 break;
 
             case "batchdeduct":
@@ -388,6 +396,11 @@ public class BagCommand implements CommandExecutor {
             return;
         }
 
+        var shared=Chuwudai.getInstance().getSharedStorage();
+        if(shared!=null) {
+            var key=new com.horizonkk.chuwudai.storage.MySqlRepository.Key(com.horizonkk.chuwudai.storage.MySqlRepository.Kind.BAG,bagId);
+            if(!shared.isReady(key)) { shared.prepare(key).whenComplete((v,e)->shared.onMain(()->{ if(e==null) handleGetBagCommand(sender,args,prefix); else sender.sendMessage("§c读取失败："+e.getMessage()); return null; })); return; }
+        }
         com.horizonkk.chuwudai.bag.BagData bagData = bagManager.getBagData(bagId);
         if (bagData == null) {
             sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&c找不到ID为 &e" + bagId + " &c的储物袋数据！"));
@@ -550,10 +563,10 @@ public class BagCommand implements CommandExecutor {
             sender.sendMessage(ColorUtils.translateColorCodes("&7玩家自用: &f/chuwudai getbag <ID> [样式]"));
         }
         if (sender.hasPermission("chuwudai.open")) {
-            sender.sendMessage(ColorUtils.translateColorCodes("&e/chuwudai open <ID> &7- 打开指定ID的储物袋"));
+            sender.sendMessage(ColorUtils.translateColorCodes("&e/chuwudai open <ID> &7- 打开背包中携带的指定ID储物袋"));
         }
         if (sender.hasPermission("chuwudai.tempbox")) {
-            sender.sendMessage(ColorUtils.translateColorCodes("&e/chuwudai tempbox [玩家] &7- 打开暂存箱(54格，关服自动清理)"));
+            sender.sendMessage(ColorUtils.translateColorCodes("&e/chuwudai tempbox [玩家] &7- 打开暂存箱(54格，重启后保留)"));
         }
         if (sender.hasPermission("chuwudai.migrate")) {
             sender.sendMessage(ColorUtils.translateColorCodes("&e/chuwudai migratepages confirm &7- migrate legacy bag blobs into paged storage"));

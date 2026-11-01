@@ -15,6 +15,9 @@ import java.util.zip.Deflater;
 import java.util.zip.Inflater;
 
 public class PillDataManager {
+    private boolean mysql() { return Chuwudai.getInstance().getSharedStorage()!=null; }
+    private com.horizonkk.chuwudai.storage.MySqlRepository.Key key(String id) { return new com.horizonkk.chuwudai.storage.MySqlRepository.Key(com.horizonkk.chuwudai.storage.MySqlRepository.Kind.PILL, id); }
+
 
     private final Map<String, PillData> loadedPills = new HashMap<>();
     private final String storageType;
@@ -32,7 +35,9 @@ public class PillDataManager {
             this.dataFolder = null;
 
             // 初始化数据库连接池
-            DatabaseManager.initialize(dbPath);
+            // Pool is initialized once by Chuwudai.
+        } else if ("mysql".equalsIgnoreCase(storageType)) {
+            this.dbPath=null; this.dataFolder=null;
         } else {
             // YAML存储（默认）
             String folder = Chuwudai.getInstance().getConfig().getString("storage.yaml.folder", "pills");
@@ -45,6 +50,7 @@ public class PillDataManager {
     }
 
     public boolean pillExists(String pillId) {
+        if(mysql()) { Chuwudai.getInstance().getSharedStorage().get(key(pillId)); return true; }
         if ("sqlite".equalsIgnoreCase(storageType)) {
             return pillExistsInSQLite(pillId);
         } else {
@@ -74,6 +80,7 @@ public class PillDataManager {
     }
 
     public PillData loadPill(String pillId) {
+        if(mysql()) return (PillData)Chuwudai.getInstance().getSharedStorage().get(key(pillId));
         // 如果已经在内存中，直接返回
         if (loadedPills.containsKey(pillId)) {
             return loadedPills.get(pillId);
@@ -150,6 +157,7 @@ public class PillDataManager {
     }
 
     public void savePill(PillData pillData) {
+        if(mysql()) { Chuwudai.getInstance().getSharedStorage().touch(key(pillData.getId())); return; }
         if ("sqlite".equalsIgnoreCase(storageType)) {
             savePillToSQLite(pillData);
         } else {
@@ -203,6 +211,7 @@ public class PillDataManager {
     }
 
     public void loadAllPills() {
+        if(mysql()) return;
         if ("sqlite".equalsIgnoreCase(storageType)) {
             loadAllPillsFromSQLite();
         } else {
@@ -255,6 +264,7 @@ public class PillDataManager {
     }
 
     public void saveAllPills() {
+        if(mysql()) return;
         int count = 0;
         for (PillData pillData : loadedPills.values()) {
             savePill(pillData);
@@ -265,7 +275,7 @@ public class PillDataManager {
 
     public void close() {
         if ("sqlite".equalsIgnoreCase(storageType)) {
-            DatabaseManager.close();
+            // Pool is closed once by Chuwudai.
         }
     }
 

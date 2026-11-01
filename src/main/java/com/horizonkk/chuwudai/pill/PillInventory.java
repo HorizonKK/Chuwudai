@@ -64,6 +64,12 @@ public class PillInventory implements InventoryHolder {
     }
 
     public void saveItems() {
+        var shared=Chuwudai.getInstance().getSharedStorage();
+        if(shared==null) { saveItemsInternal(); return; }
+        var key=new com.horizonkk.chuwudai.storage.MySqlRepository.Key(com.horizonkk.chuwudai.storage.MySqlRepository.Kind.PILL,pillData.getId());
+        if(shared.isReady(key)) shared.withViewChange(key,this::saveItemsInternal);
+    }
+    private void saveItemsInternal() {
         boolean changed = false;
 
         for (int slot = 0; slot < Math.min(pillData.getSize(), 54); slot++) {
