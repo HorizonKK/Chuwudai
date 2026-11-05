@@ -14,7 +14,7 @@ commands:
   chuwudai:
     description: 储物袋主命令
     aliases: [cd, bag]
-    usage: /<command> <give|getbag|open|tempbox|migratepages|reload|help>
+    usage: /<command> <give|getbag|open|tempbox|migratepages|migratesqlite|reload|help>
 
 permissions:
   chuwudai.give:
@@ -39,7 +39,7 @@ permissions:
     description: 允许重载插件
     default: op
   chuwudai.migrate:
-    description: Allows migrating legacy bag blob data into paged storage
+    description: 允许旧储物袋分页转换及 SQLite 到 MySQL 数据迁移
     default: op
   chuwudai.*:
     description: 所有储物袋权限

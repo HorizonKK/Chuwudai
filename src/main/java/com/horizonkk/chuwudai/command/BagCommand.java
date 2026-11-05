@@ -171,6 +171,10 @@ public class BagCommand implements CommandExecutor {
                 handleMigratePagesCommand(sender, args, prefix);
                 break;
 
+            case "migratesqlite":
+                handleMigrateSqliteCommand(sender, args, prefix);
+                break;
+
             case "reload":
                 if (!sender.hasPermission("chuwudai.reload")) {
                     sender.sendMessage(ColorUtils.translateColorCodes(prefix + Chuwudai.getInstance().getConfig().getString("messages.no-permission", "&c你没有权限执行此命令！")));
@@ -303,6 +307,53 @@ public class BagCommand implements CommandExecutor {
                 break;
         }
         return true;
+    }
+
+    private void handleMigrateSqliteCommand(CommandSender sender, String[] args, String prefix) {
+        if(!sender.hasPermission("chuwudai.migrate")) {
+            sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&c没有权限: chuwudai.migrate"));
+            return;
+        }
+        if(!(sender instanceof org.bukkit.command.ConsoleCommandSender)
+                && !(sender instanceof org.bukkit.command.RemoteConsoleCommandSender)) {
+            sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&c请在服务端控制台执行 SQLite 迁移。"));
+            return;
+        }
+        if(args.length!=2 || !("check".equalsIgnoreCase(args[1]) || "start".equalsIgnoreCase(args[1]))) {
+            sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&e用法: chuwudai migratesqlite <check|start>"));
+            sender.sendMessage(ColorUtils.translateColorCodes("&7check 检查数据和冲突；start 导入，跳过 MySQL 已有 ID，保留 SQLite 原文件。"));
+            return;
+        }
+        Chuwudai plugin=Chuwudai.getInstance();
+        var shared=plugin.getSharedStorage();
+        if(shared==null) {
+            sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&c请先正常停服保存 SQLite，配置 MySQL 后以 storage.type: mysql 重启，再执行迁移。"));
+            return;
+        }
+        java.nio.file.Path source=plugin.getDataFolder().toPath().resolve(plugin.getConfig().getString("storage.sqlite.file","bags.db"));
+        boolean dryRun="check".equalsIgnoreCase(args[1]);
+        var job=shared.migrateSqlite(source,dryRun);
+        if(!job.isCompletedExceptionally()) sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&a已开始 SQLite " + (dryRun ? "检查" : "导入") + "，源文件: " + source));
+        job.whenComplete((result,error)->{
+            if(!plugin.isEnabled()) return;
+            shared.onMain(()->{
+                if(error!=null) {
+                    Throwable cause=error;
+                    while(cause.getCause()!=null && (cause instanceof java.util.concurrent.CompletionException || cause instanceof java.util.concurrent.ExecutionException)) cause=cause.getCause();
+                    sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&c迁移未完成: " + cause.getMessage()));
+                    return null;
+                }
+                String verb=dryRun ? "可导入" : "已导入";
+                sender.sendMessage(ColorUtils.translateColorCodes(prefix + "&aSQLite " + (dryRun ? "检查" : "导入") + "结束。&7扫描: &f" + result.scanned()));
+                sender.sendMessage(ColorUtils.translateColorCodes("&7" + verb + "储物袋: &f" + result.imported().getOrDefault(com.horizonkk.chuwudai.storage.MySqlRepository.Kind.BAG,0L)
+                        + " &7丹瓶: &f" + result.imported().getOrDefault(com.horizonkk.chuwudai.storage.MySqlRepository.Kind.PILL,0L)
+                        + " &7暂存箱: &f" + result.imported().getOrDefault(com.horizonkk.chuwudai.storage.MySqlRepository.Kind.TEMP,0L)));
+                sender.sendMessage(ColorUtils.translateColorCodes("&7已有 ID 跳过: &e" + result.existing() + " &7正在占用跳过: &e" + result.busy() + " &7数据异常: &c" + result.failed()));
+                sender.sendMessage(ColorUtils.translateColorCodes("&7明细报告: &f" + result.reportFile()));
+                if(result.existing()+result.busy()+result.failed()>0) sender.sendMessage(ColorUtils.translateColorCodes("&e仍有未迁移的容器，请检查报告；已有 ID 不会自动覆盖，包括空暂存箱。"));
+                return null;
+            });
+        });
     }
 
     private void handleMigratePagesCommand(CommandSender sender, String[] args, String prefix) {
@@ -570,6 +621,7 @@ public class BagCommand implements CommandExecutor {
         }
         if (sender.hasPermission("chuwudai.migrate")) {
             sender.sendMessage(ColorUtils.translateColorCodes("&e/chuwudai migratepages confirm &7- migrate legacy bag blobs into paged storage"));
+            sender.sendMessage(ColorUtils.translateColorCodes("&e/chuwudai migratesqlite <check|start> &7- 控制台检查或导入 SQLite 到 MySQL"));
         }
         if (sender.hasPermission("chuwudai.reload")) {
             sender.sendMessage(ColorUtils.translateColorCodes("&e/chuwudai reload &7- 重载插件配置文件"));

@@ -26,6 +26,7 @@ public final class Chuwudai extends JavaPlugin {
     private PillDataManager pillDataManager;
     private TempBoxManager tempBoxManager;
     private ModBagBridge modBagBridge;
+    private PlaceholderAPI placeholderExpansion;
     private String activeStorageType;
     private com.horizonkk.chuwudai.storage.SharedStorage sharedStorage;
     public com.horizonkk.chuwudai.storage.SharedStorage getSharedStorage() { return sharedStorage; }
@@ -67,8 +68,13 @@ public final class Chuwudai extends JavaPlugin {
 
         // 注册 PlaceholderAPI 扩展
         if (getServer().getPluginManager().getPlugin("PlaceholderAPI") != null) {
-            new PlaceholderAPI(this).register();
-            getLogger().info("PlaceholderAPI 扩展已注册！");
+            placeholderExpansion = new PlaceholderAPI(this);
+            if (placeholderExpansion.register()) {
+                placeholderExpansion.start();
+                getLogger().info("PlaceholderAPI 扩展已注册，支持异步读取显示缓存！");
+            } else {
+                getLogger().warning("PlaceholderAPI 扩展注册失败！");
+            }
         } else {
             getLogger().warning("PlaceholderAPI 未找到，变量功能将不可用！");
         }
@@ -83,6 +89,7 @@ public final class Chuwudai extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (placeholderExpansion != null) placeholderExpansion.close();
         if (tempBoxManager != null) tempBoxManager.close();
         if (modBagBridge != null) {
             try { modBagBridge.closeAll(); } catch(RuntimeException e) { getLogger().warning("界面关闭失败，继续保存容器: "+e.getMessage()); }
